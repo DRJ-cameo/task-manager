@@ -1,0 +1,527 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Sign in — Task Management Tool</title>
+<style>
+  :root{
+    --bg1:#071029; --bg2:#0b1630; --accent:#06b981; --muted:#94a3b8;
+    --card-radius:14px; --glass: rgba(255,255,255,0.03);
+    /* tweak this to speed up/slow down the stagger (ms) */
+    --stagger-ms: 90;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+    -webkit-font-smoothing:antialiased; background: linear-gradient(180deg,var(--bg1),var(--bg2));
+    color:#fff; overflow-y:auto;
+  }
+
+  /* Parallax background layer */
+  .bg-layer{ position:fixed; inset:0; z-index:-2; overflow:hidden; pointer-events:none; }
+  .bg-layer img{ width:120%; height:120%; object-fit:cover; transform-origin:center; filter:brightness(.65) saturate(.95);
+    animation:slowFloat 22s ease-in-out infinite alternate; }
+  @keyframes slowFloat{ from{ transform:translateY(0) scale(1) } to{ transform:translateY(-30px) scale(1.05) } }
+
+  /* subtle grain overlay */
+  .grain{ position:fixed; inset:0; background-image:radial-gradient(rgba(255,255,255,0.02) 1px, transparent 1px); background-size:6px 6px; opacity:0.35; z-index:-1; pointer-events:none; }
+
+  header{ padding:48px 6vw 24px; display:flex; align-items:center; justify-content:space-between; gap:20px; }
+  .brand{ display:flex; gap:12px; align-items:center }
+  .brand .logo{ width:48px; height:48px; border-radius:10px; background:#fff; color:#071029; display:flex; align-items:center; justify-content:center; font-weight:800 }
+  .nav{ display:flex; gap:14px; align-items:center }
+  .nav a{ color:var(--muted); text-decoration:none; font-weight:600 }
+
+  /* hero grid */
+  .hero{ display:grid; grid-template-columns: 1fr 420px; gap:36px; align-items:start; padding:40px 6vw; }
+  @media (max-width:1000px){ .hero{ grid-template-columns: 1fr; } }
+
+  .hero-left{ max-width:740px }
+  .eyebrow{ color:var(--accent); font-weight:800; letter-spacing:.6px; margin-bottom:12px }
+  h1{ font-size:44px; line-height:1.02; margin:0 0 12px }
+  p.lead{ color:var(--muted); margin:0 0 22px; font-size:16px }
+
+  .cta-row{ display:flex; gap:12px; align-items:center }
+  .btn-primary{ display:inline-flex; align-items:center; justify-content:center;
+    background: linear-gradient(90deg,var(--accent), #03956d); color:#fff; border:none; padding:12px 18px; border-radius:12px; font-weight:800; cursor:pointer;
+    box-shadow:0 10px 30px rgba(2,8,20,.36); transition: transform .18s ease, box-shadow .18s ease; text-decoration:none; }
+  .btn-primary:hover{ transform: translateY(-4px); box-shadow:0 20px 40px rgba(2,8,20,.44); }
+  .btn-ghost{ background:transparent; border:1px solid rgba(255,255,255,0.06); color:var(--muted); padding:10px 14px; border-radius:10px; cursor:pointer }
+
+  /* login panel */
+  .panel{ background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02)); color:#fff; padding:22px; border-radius:12px; box-shadow:0 20px 50px rgba(2,6,23,0.6); backdrop-filter: blur(8px); }
+  .login-wrap{ position:sticky; top:24px; height:max-content }
+  @media (max-width:1000px){ .login-wrap{ position:relative; margin-top:18px } }
+
+  form{ display:flex; flex-direction:column; gap:12px }
+  label{ font-weight:700; color:#cbd5e1; font-size:13px }
+  input{ width:100%; padding:12px 14px; border-radius:10px; border:none; font-size:15px; outline:none; background:#fff; color:#071029 }
+  .pw-wrap{ position:relative }
+  .pw-toggle{ position:absolute; right:10px; top:50%; transform:translateY(-50%); background:transparent; border:none; cursor:pointer; padding:6px; font-size:16px }
+  .submit{ margin-top:6px; background:linear-gradient(90deg,var(--accent), #03956d); padding:12px; border-radius:10px; border:none; font-weight:800; color:#fff; cursor:pointer;
+    transition: transform .12s ease, box-shadow .12s ease; box-shadow:0 8px 24px rgba(2,8,20,0.25); position:relative; overflow:hidden; }
+  .submit:hover{ transform: translateY(-4px); box-shadow:0 20px 40px rgba(2,8,20,0.36); }
+  .submit:active{ transform: translateY(0) scale(.995); }
+
+  /* subtle animated sheen for sign-in */
+  .submit::after{
+    content:""; position:absolute; left:-40%; top:0; width:40%; height:100%;
+    background: linear-gradient(90deg, rgba(255,255,255,0.06), rgba(255,255,255,0.18), rgba(255,255,255,0.06));
+    transform: skewX(-18deg) translateX(-100%);
+    transition: transform .9s ease;
+  }
+  .submit:hover::after{ transform: skewX(-18deg) translateX(300%); }
+
+  /* social row (legacy text buttons kept for fallback) */
+  .social-row{ display:flex; gap:10px; margin-top:10px; justify-content:center; align-items:center }
+  .social-btn{ flex:1; padding:10px; border-radius:10px; border:1px solid rgba(255,255,255,0.06); background:#fff; color:#071029; font-weight:700; cursor:pointer }
+
+  /* new logo buttons (replace the old text buttons) */
+  .social-row.logos {
+    display:flex;
+    gap:14px;
+    justify-content:center;
+    margin-top:12px;
+  }
+
+  .social-icon-btn {
+    width:56px;
+    height:56px;
+    border-radius:12px;
+    background: linear-gradient(180deg, #fff, #f7f7f7);
+    border:none;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    box-shadow: 0 8px 28px rgba(2,8,20,0.28);
+    transition: transform .16s cubic-bezier(.2,.9,.2,1), box-shadow .16s;
+  }
+  .social-icon-btn:focus{ outline: 3px solid rgba(6,185,129,0.14); outline-offset:4px; }
+  .social-icon-btn img{ width:26px; height:26px; display:block; }
+  .social-icon-btn:hover{ transform: translateY(-6px) scale(1.06); box-shadow:0 18px 40px rgba(2,8,20,0.36); }
+
+  /* sections below hero */
+  section { padding:60px 6vw; }
+  /* FEATURES - modified to increase visibility and match animated reveal */
+  .features{ display:grid; grid-template-columns: repeat(3,1fr); gap:20px }
+  @media (max-width:900px){ .features{ grid-template-columns:1fr } }
+
+  /* stronger, more visible feature cards */
+  .feature{
+    background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03));
+    border: 1px solid rgba(255,255,255,0.04);
+    padding:28px;
+    border-radius:12px;
+    box-shadow: 0 20px 40px rgba(2,6,23,0.5);
+    color: #f8fafc;
+    transform: translateY(18px);
+    opacity: 0;
+    transition: transform .52s cubic-bezier(.2,.9,.2,1), opacity .5s ease, box-shadow .4s ease;
+    will-change: transform, opacity;
+    backdrop-filter: blur(6px);
+  }
+  /* visible state (applied when in view) */
+  .feature.visible{
+    transform: translateY(0);
+    opacity: 1;
+  }
+  /* slight hover lift to match task cards feel */
+  .feature:hover{
+    transform: translateY(-6px);
+    box-shadow: 0 30px 60px rgba(2,6,23,0.56);
+  }
+
+  .feature h4{ margin:0 0 8px; color:#fff; font-size:18px }
+  .feature p{ color:var(--muted); margin:0 }
+
+  /* new callout style for the Reminder demo and About boxes (same reveal behaviour) */
+  .callout-row{ display:flex; gap:12px; flex-wrap:wrap; margin-top:14px; }
+  .callout {
+    flex:1;
+    min-width:260px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+    border:1px solid rgba(255,255,255,0.04);
+    padding:18px;
+    border-radius:12px;
+    box-shadow: 0 18px 44px rgba(2,6,23,0.46);
+    color:#f8fafc;
+    transform: translateY(18px);
+    opacity:0;
+    transition: transform .52s cubic-bezier(.2,.9,.2,1), opacity .45s ease, box-shadow .4s;
+    backdrop-filter: blur(6px);
+    display:flex;
+    gap:12px;
+    align-items:flex-start;
+  }
+  .callout.visible{ transform: translateY(0); opacity:1; }
+  .callout p{ color:var(--muted); margin:0; line-height:1.45; flex:1 }
+
+  /* small icon inside callout */
+  .callout .icon {
+    width:44px; height:44px; border-radius:10px;
+    display:flex; align-items:center; justify-content:center; flex:0 0 44px;
+    font-size:20px;
+    background: linear-gradient(180deg, rgba(6,185,129,0.06), rgba(6,185,129,0.02));
+    box-shadow: 0 6px 22px rgba(6,185,129,0.08), 0 0 18px rgba(6,185,129,0.06) inset;
+  }
+  /* variant colors for different icons (keeps same layout) */
+  .icon-bell{ background: linear-gradient(180deg, rgba(255,200,50,0.06), rgba(255,200,50,0.02)); box-shadow:0 6px 22px rgba(255,200,50,0.06), 0 0 18px rgba(255,200,50,0.04) inset; }
+  .icon-mail{ background: linear-gradient(180deg, rgba(66,133,244,0.06), rgba(66,133,244,0.02)); box-shadow:0 6px 22px rgba(66,133,244,0.06), 0 0 18px rgba(66,133,244,0.04) inset; }
+  .icon-rocket{ background: linear-gradient(180deg, rgba(255,90,120,0.06), rgba(255,90,120,0.02)); box-shadow:0 6px 22px rgba(255,90,120,0.06), 0 0 18px rgba(255,90,120,0.04) inset; }
+
+  footer{ padding:30px 6vw; color:var(--muted); text-align:center }
+
+  /* small helper */
+  .muted { color:var(--muted) }
+
+  /* responsive tweaks */
+  @media (max-width:540px){
+    .social-icon-btn{ width:48px; height:48px; }
+    .social-icon-btn img{ width:20px; height:20px; }
+    .feature{ padding:18px; }
+    .callout{ padding:14px; }
+    .callout .icon{ width:40px; height:40px; font-size:18px; flex:0 0 40px }
+  }
+
+  /* Respect prefers-reduced-motion */
+  @media (prefers-reduced-motion: reduce) {
+    .feature, .callout, .submit::after { transition: none !important; animation: none !important; }
+  }
+  /* ----------------
+   MOBILE-SPECIFIC OVERRIDES
+   Append these rules to the end of your existing <style> block.
+   They only apply to narrow screens and do not change desktop layout.
+   ---------------- */
+@media (max-width: 1000px) {
+  /* already has some rules, keep default behavior consistent */
+  .hero { grid-template-columns: 1fr; gap: 20px; padding: 28px 5vw; }
+}
+
+/* Mobile phones: tighter layout + larger controls */
+/* Mobile-friendly nav: compact, horizontally scrollable so items remain visible */
+@media (max-width: 600px) {
+  /* header tweaks so nav can wrap / sit below the logo if needed */
+  header {
+    align-items: flex-start;    /* allow the nav to sit below the brand if needed */
+    gap: 12px;
+  }
+
+  /* show the nav on mobile as a compact horizontal row */
+  .nav {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    justify-content: flex-end;
+    width: 100%;
+    overflow-x: auto;           /* allow horizontal scrolling on extremely narrow screens */
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 6px;
+    scrollbar-width: none;      /* hide scrollbar in Firefox */
+  }
+  /* hide the scrollbar visually (WebKit) */
+  .nav::-webkit-scrollbar { display: none; }
+
+  /* make links easier to tap on small screens */
+  .nav a {
+    flex: 0 0 auto;             /* don't shrink; stay tappable */
+    padding: 6px 8px;
+    white-space: nowrap;
+    color: var(--muted);
+    font-weight: 700;
+    font-size: 14px;
+  }
+
+  /* If header becomes too cramped, make nav drop below the brand */
+  @media (max-width: 420px) {
+    header { flex-direction: column; align-items: stretch; padding: 14px 4vw; }
+    .brand { justify-content: space-between; width: 100%; }
+    .nav { justify-content: flex-start; margin-top: 6px; }
+  }
+}
+  .logo-img {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px; /* rounded style like your design */
+  object-fit: cover;
+  display: block;
+}
+
+/* --- Fix header wrapping issue on narrow mobile screens --- */
+/* Insert this at the end of your existing <style> block */
+
+header {
+  flex-wrap: wrap;               /* allow brand and nav to wrap when needed */
+  align-items: center;           /* keep items vertically aligned */
+}
+
+/* Keep the brand compact so it cannot stretch and push its label to the right */
+.brand {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex: 0 0 auto;                /* do not grow or shrink unexpectedly */
+}
+
+/* Prevent the brand's inner text block from expanding beyond its content */
+.brand > div {
+  min-width: 0;                  /* allows proper truncation/wrapping inside flex */
+}
+
+/* Make nav flexible but keep it on the right on larger phones.
+   On very small devices it will become horizontally scrollable (still tappable). */
+.nav {
+  flex: 1 1 auto;
+  justify-content: flex-end;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  overflow-x: auto;              /* preserves links when space is tight */
+  -webkit-overflow-scrolling: touch;
+}
+
+/* If the header becomes too cramped, stack nav below brand (tiny devices) */
+@media (max-width: 420px) {
+  header { flex-direction: column; align-items: stretch; gap: 8px; padding: 14px 4vw; }
+  .brand { justify-content: flex-start; width: 100%; }
+  .nav   { justify-content: flex-start; margin-top: 6px; }
+}
+
+
+
+
+</style>
+</head>
+<body>
+  <!-- background image (must exist at /static/images/bacgroung_img.png or set your own file) -->
+  <div class="bg-layer"><img src="/static/images/bacgroung_img.png" alt="background illustration"></div>
+  <div class="grain" aria-hidden="true"></div>
+
+  <header>
+    <div class="brand">
+  <img src="/static/images/logo.png" alt="Task Manager Logo" class="logo-img">
+  <div>
+    <div style="font-weight:800">Task Manager</div>
+    <div style="font-size:12px;color:var(--muted)"></div>
+  </div>
+</div>
+
+
+    <nav class="nav" aria-label="top navigation">
+      <a href="#features">Features</a>
+      <a href="#reminder">Reminder</a>
+      <a href="#about">About</a>
+      <a href="/signup">Sign up</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="hero">
+      <div class="hero-left">
+        <div class="eyebrow">Stay focused • Ship faster</div>
+        <h1>Manage tasks, deadlines and reminders — all in one place</h1>
+        <p class="lead">Create tasks, set priorities and due dates, get reminders and track progress. Designed for students and small teams.</p>
+
+        <div class="cta-row">
+          <!-- GET STARTED goes to /dashboard (so clicking works) -->
+          <a href="/dashboard" class="btn-primary" role="button" title="Go to dashboard">Get started</a>
+          <button class="btn-ghost" type="button" id="learnBtn">Learn more</button>
+        </div>
+      </div>
+
+      <aside class="login-wrap" aria-label="Sign in area">
+        <div class="panel" role="region" aria-labelledby="signin-title">
+          <h3 id="signin-title" style="margin:0 0 6px">Sign in to your account</h3>
+
+          <!-- keep form action /login like your server expects -->
+          <form action="/login" method="post" autocomplete="on" novalidate>
+            <div>
+              <label for="username">Username or Email</label>
+              <input id="username" name="username" type="text" autocomplete="username" required placeholder="Enter username or email">
+            </div>
+
+            <div>
+              <label for="password">Password</label>
+              <div class="pw-wrap">
+                <input id="password" name="password" type="password" autocomplete="current-password" required placeholder="Enter your password">
+                <button type="button" id="pwToggle" class="pw-toggle" aria-label="Show password" title="Show password">👁️</button>
+              </div>
+            </div>
+
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="remember" aria-label="Remember me"> Remember</label>
+              <a href="/forgot_pass" style="color:var(--muted); font-weight:700; text-decoration:none">Forgot?</a>
+            </div>
+
+            <!-- Sign in button with animated sheen -->
+            <button class="submit" type="submit" id="signInBtn">Sign in</button>
+
+            <div style="margin-top:8px; text-align:center; color:var(--muted); font-size:13px">or continue with</div>
+
+            <!-- Social logo buttons (replace plain text buttons) -->
+            <div class="social-row logos" role="group" aria-label="social sign in">
+              <!-- IMPORTANT: place SVG icons at /static/icons/google.svg, /static/icons/github.svg, /static/icons/apple.svg -->
+              <button class="social-icon-btn" type="button" onclick="socialSign('google')" title="Continue with Google" aria-label="Continue with Google">
+                <img src="/static/icons/google.svg" alt="Google">
+              </button>
+
+              <button class="social-icon-btn" type="button" onclick="socialSign('github')" title="Continue with GitHub" aria-label="Continue with GitHub">
+                <img src="/static/icons/github.svg" alt="GitHub">
+              </button>
+
+              <button class="social-icon-btn" type="button" onclick="socialSign('apple')" title="Continue with Apple" aria-label="Continue with Apple">
+                <img src="/static/icons/apple.svg" alt="Apple">
+              </button>
+            </div>
+
+          </form>
+        </div>
+      </aside>
+    </div>
+
+    <section id="features">
+      <h2 style="margin:0 0 18px">Key features</h2>
+      <div class="features">
+        <div class="feature" data-animate><h4>Organize tasks</h4><p>Create lists, add details, set due dates and priority.</p></div>
+        <div class="feature" data-animate><h4>Reminders</h4><p>Get notified before deadlines — configurable reminder times.</p></div>
+        <div class="feature" data-animate><h4>Personal dashboard</h4><p>See your progress at a glance, filter and sort tasks easily.</p></div>
+      </div>
+    </section>
+
+    <section id="reminder">
+      <h2 style="margin:0 0 18px">Reminder </h2>
+      <p class="muted" data-animate>Reminders can be shown as in-app alerts or emailed/pushed (requires hosting & HTTPS for push notifications).</p>
+      <div class="callout-row">
+        <div class="callout" data-animate>
+          <div class="icon icon-bell" aria-hidden="true">🔔</div>
+          <p>Set a reminder on a task card — it will appear here when active (server side scheduler required).</p>
+        </div>
+
+        <div class="callout" data-animate>
+          <div class="icon icon-mail" aria-hidden="true">✉️</div>
+          <p>Reminders may be delivered by email — configure SMTP credentials on the server to enable email reminders.</p>
+        </div>
+
+        <div class="callout" data-animate>
+          <div class="icon icon-rocket" aria-hidden="true">🚀</div>
+          <p>Push notifications (best experience) require HTTPS + Service Worker and a push subscription for background delivery.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="about">
+      <h2 style="margin:0 0 12px">About TM </h2>
+      <p class="muted callout" data-animate> Task Manager (TM) is a modern and beautifully designed productivity tool built to help 
+        students, professionals, and teams stay organized. It brings together smart task 
+        tracking, prioritization, progress monitoring, and clean UI — all into one 
+        lightweight web application.</p>
+    </section>
+  </main>
+
+  <footer>© 2025 Task Manager </footer>
+
+<script>
+  // password reveal toggle
+  (function(){
+    const pw = document.getElementById('password');
+    const btn = document.getElementById('pwToggle');
+    if(pw && btn){
+      btn.addEventListener('click', () => {
+        const isPwd = pw.type === 'password';
+        pw.type = isPwd ? 'text' : 'password';
+        btn.setAttribute('aria-pressed', isPwd ? 'true' : 'false');
+        btn.title = isPwd ? 'Hide password' : 'Show password';
+        pw.focus();
+      });
+    }
+  })();
+
+  // Wait for DOM to be ready before setting up observer and stagger
+  document.addEventListener('DOMContentLoaded', () => {
+    // select elements that should animate (features, callouts, about)
+    const animated = Array.from(document.querySelectorAll('[data-animate]'));
+
+    if(!animated.length){
+      console.debug('No animated elements found');
+      return;
+    }
+
+    // read the stagger base from CSS variable (falls back to 90ms)
+    const cssStagger = getComputedStyle(document.documentElement).getPropertyValue('--stagger-ms').trim();
+    const baseMs = parseInt(cssStagger, 10) || 90;
+
+    // apply incremental stagger delay
+    animated.forEach((el, i) => {
+      el.style.transitionDelay = `${i * baseMs}ms`;
+      el.classList.remove('visible');
+    });
+
+    // IntersectionObserver options
+    const obsOptions = { threshold: 0.16, root: null, rootMargin: '0px 0px -12% 0px' };
+
+    const obs = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if(entry.isIntersecting){
+          entry.target.classList.add('visible');
+          obs.unobserve(entry.target);
+        }
+      });
+    }, obsOptions);
+
+    animated.forEach(el => obs.observe(el));
+    console.debug('Animation observer attached to', animated.length, 'elements (stagger base:', baseMs, 'ms)');
+  });
+
+  // smooth anchor scrolling
+  document.querySelectorAll('a[href^="#"]').forEach(a => {
+    a.addEventListener('click', (e) => {
+      e.preventDefault();
+      const target = document.querySelector(a.getAttribute('href'));
+      if (target) target.scrollIntoView({ behavior: 'smooth' });
+    });
+  });
+
+  // Learn more anchor -> scroll to features
+  const learnBtn = document.getElementById('learnBtn');
+  if(learnBtn){
+    learnBtn.addEventListener('click', () => {
+      const tgt = document.getElementById('features');
+      if(tgt) tgt.scrollIntoView({ behavior: 'smooth' });
+    });
+  }
+
+  // social sign placeholders
+  function socialSign(provider){
+    alert('Continue with ' + provider + ' (not configured).');
+  }
+
+  // subtle click animation for sign-in button (client-side only)
+  const signBtn = document.getElementById('signInBtn');
+  if(signBtn){
+    signBtn.addEventListener('click', (e) => {
+      signBtn.animate([{ transform: 'translateY(0)' }, { transform: 'translateY(-4px)' }, { transform: 'translateY(0)' }], { duration: 220 });
+    });
+  }
+  // read flashed messages (category + text) injected as JSON by Jinja
+  const flashed = JSON.parse('{{ get_flashed_messages(with_categories=True) | tojson | safe }}');
+
+  (function() {
+    if (!Array.isArray(flashed) || flashed.length === 0) return;
+
+    const errors = flashed.filter(([cat, msg]) => cat === 'error').map(([_, msg]) => msg);
+
+    if (errors.length) {
+      // simple alert
+      alert(errors.join("\n"));
+
+      // --- OR: nicer toast instead of alert. Example:
+      // showToast(errors.join("\n"));
+    }
+  })();
+
+</script>
+ 
+</body>
+</html>

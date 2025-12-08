@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Forgot Password - Task Management Tool</title>
+<style>
+    body { margin:0; font-family:Arial,sans-serif; background: linear-gradient(to right,#112940,#a29bfe); height:100vh; display:flex; justify-content:center; align-items:center; }
+    .forgot-container { background:white; padding:35px 40px; border-radius:12px; box-shadow:0 0 15px rgba(0,0,0,0.2); width:350px; }
+    h2 { text-align:center; color:#2d3436; margin-bottom:10px; }
+    label { display:block; margin-bottom:5px; font-weight:bold; color:#2d3436; }
+    input { width:100%; padding:10px; margin-bottom:15px; border:1px solid #ccc; border-radius:6px; box-sizing:border-box; }
+    button { width:100%; background-color:#0a6bb5; color:white; padding:10px; border:none; border-radius:6px; font-size:16px; cursor:pointer; }
+    button:hover { background-color:#0652DD; }
+    .links { text-align:center; margin-top:15px; font-size:14px; }
+    .links a { color:#0878ce; text-decoration:none; margin:0 5px; }
+    .links a:hover { text-decoration:underline; }
+</style>
+</head>
+<body>
+<div class="forgot-container">
+<h2>Forgot Password</h2>
+<form action="{{ url_for('handle_forgot_password') }}" method="post">
+    <label for="email">Enter your email</label>
+    <input type="email" id="email" name="email" placeholder="Your registered email" required>
+
+    <button type="submit">Send Reset Link</button>
+
+    <div class="links">
+        <a href="{{ url_for('login') }}">Back to Login</a>
+    </div>
+</form>
+</div>
+</body>
+</html>

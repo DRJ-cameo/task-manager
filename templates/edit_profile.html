@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Edit Profile - Task Manager</title>
+
+  <style>
+    :root {
+      --bg1:#6a11cb;
+      --bg2:#2575fc;
+      --card: rgba(255,255,255,0.08);
+      --muted: rgba(255,255,255,0.9);
+      --panel-shadow: 0 10px 30px rgba(0,0,0,0.18);
+      --radius: 14px;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Poppins", sans-serif;
+      background: linear-gradient(135deg,var(--bg1),var(--bg2));
+      min-height: 100vh;
+      color: white;
+      background-size: 400% 400%;
+      animation: floatingBg 18s infinite alternate linear;
+    }
+
+    @keyframes floatingBg {
+      from { background-position: 0 0; }
+      to { background-position: 100% 100%; }
+    }
+
+    /* 🔹 NAVBAR + ANIMATED HAMBURGER (same as profile / mytask) */
+    .navbar{
+      display:flex; align-items:center; justify-content:space-between;
+      padding:12px 20px; background: rgba(0,0,0,0.22); backdrop-filter: blur(6px);
+      position:relative; z-index:1000;
+    }
+    .brand{ font-weight:700; font-size:1.05rem; letter-spacing:0.6px; }
+
+    .menu-icon{
+      display:flex; flex-direction:column; gap:5px; cursor:pointer; padding:8px; z-index:1100;
+    }
+    .menu-icon div{
+      width:28px; height:3.6px; background:rgba(255,255,255,0.96); border-radius:3px;
+      transition: transform .18s, opacity .18s;
+    }
+
+    .menu{
+      position:absolute; right:20px; top:calc(100% + 12px);
+      width:220px;
+      background: linear-gradient(180deg, rgba(6,10,30,0.98), rgba(10,16,40,0.98));
+      border-radius:12px; padding:8px;
+      box-shadow:0 16px 40px rgba(6,12,40,0.24);
+      transform-origin: top right;
+      transform: translateY(-6px) scale(.98);
+      opacity:0;
+      pointer-events:none;
+      transition: opacity .22s ease, transform .22s cubic-bezier(.2,.9,.2,1);
+      z-index:1200;
+    }
+    .menu.open{
+      transform: translateY(0) scale(1);
+      opacity:1;
+      pointer-events:auto;
+    }
+    .menu a{
+      color:rgba(255,255,255,0.92);
+      text-decoration:none;
+      padding:10px 12px;
+      font-weight:600;
+      border-radius:8px;
+      margin:4px;
+      display:block;
+      transition: transform .12s, background .12s;
+    }
+    .menu a:hover{
+      background: rgba(255,255,255,0.03);
+      transform: translateX(4px); /* hover slide */
+    }
+
+    /* hamburger → X */
+    .menu-icon.open > div:nth-child(1){ transform: translateY(6px) rotate(45deg); }
+    .menu-icon.open > div:nth-child(2){ opacity: 0; transform: scaleX(0); }
+    .menu-icon.open > div:nth-child(3){ transform: translateY(-6px) rotate(-45deg); }
+
+    /* HEADER */
+    header {
+      text-align:center;
+      margin-top:40px;
+      animation: fadeIn 1s ease;
+    }
+    header h1 {
+      font-size:2rem;
+      margin:0;
+      text-shadow:0 4px 14px rgba(0,0,0,0.25);
+    }
+    header p {
+      opacity:0.9;
+      font-size:1rem;
+      margin-top:6px;
+    }
+
+    @keyframes fadeIn {
+      from {opacity:0; transform:translateY(-10px);}
+      to {opacity:1; transform:translateY(0);}
+    }
+
+    /* CARD + FORM */
+    .container {
+      width:90%;
+      max-width:800px;
+      margin:40px auto;
+    }
+
+    .profile-card {
+      background:var(--card);
+      padding:24px;
+      border-radius:var(--radius);
+      box-shadow:var(--panel-shadow);
+      animation: fadeInUp .8s ease;
+    }
+    @keyframes fadeInUp {
+      from {opacity:0; transform:translateY(20px);}
+      to {opacity:1; transform:translateY(0);}
+    }
+
+    .top-row {
+      display:flex;
+      align-items:center;
+      gap:18px;
+      margin-bottom:20px;
+    }
+
+    .avatar-circle {
+      width:84px;
+      height:84px;
+      border-radius:50%;
+      background:linear-gradient(135deg,#fff2,#fff1);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      color:#333;
+      font-weight:800;
+      overflow:hidden;
+      flex-shrink:0;
+    }
+
+/* Replace your existing .form-grid block with the following */
+.form-grid {
+  width: 100%;
+  max-width: 520px;        /* limits the form width and centers it inside the card */
+  margin: 0 auto 0;        /* center the form area inside .profile-card */
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  box-sizing: border-box;
+  padding: 0;              /* no extra inset inside the form wrapper */
+}
+
+/* each row inside the form-grid will fill the wrapper width */
+.form-grid > div {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;               /* ensures no extra offset */
+}
+
+/* keep the top-row (avatar + name) full width but left-aligned */
+.top-row {
+  width: 100%;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 20px;
+}
+
+/* small screens: reduce max-width so items still appear centered and comfortable */
+@media (max-width:520px) {
+  .form-grid { max-width: 100%; padding-left: 8px; padding-right: 8px; }
+}
+
+
+    label {
+      display:block;
+      font-size:0.9rem;
+      margin-bottom:6px;
+      color:var(--muted);
+    }
+
+    input[type="text"],
+    input[type="email"],
+    input[type="file"] {
+      width:100%;
+      padding:10px 12px;
+      border-radius:10px;
+      border:none;
+      outline:none;
+      font-size:0.95rem;
+      background:rgba(255,255,255,0.95);
+      color:#222;
+    }
+
+    .helper {
+      font-size:0.8rem;
+      color:var(--muted);
+      margin-top:4px;
+    }
+
+    .buttons {
+      display:flex;
+      gap:10px;
+      margin-top:22px;
+      justify-content:flex-end;
+      flex-wrap:wrap;
+    }
+
+    .btn-primary {
+      background:#00b894;
+      padding:10px 18px;
+      border-radius:10px;
+      border:none;
+      color:white;
+      font-weight:700;
+      cursor:pointer;
+      transition:0.2s;
+    }
+    .btn-primary:hover {
+      transform:translateY(-2px);
+      box-shadow:0 10px 18px rgba(0,0,0,0.22);
+    }
+
+    .btn-ghost {
+      background:transparent;
+      border:1px solid rgba(255,255,255,0.6);
+      padding:10px 18px;
+      border-radius:10px;
+      color:var(--muted);
+      font-weight:600;
+      text-decoration:none;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      cursor:pointer;
+      transition:0.2s;
+    }
+    .btn-ghost:hover {
+      background:rgba(255,255,255,0.12);
+    }
+
+    footer {
+      text-align:center;
+      margin-top:40px;
+      padding:20px;
+      opacity:0.8;
+      font-size:0.9rem;
+    }
+
+  /* Force form area to center inside the card */
+.form-section {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+}
+
+/* ---------- CENTER form inputs WITHOUT changing HTML ---------- */
+/* Make the form grid center its children while keeping full-width flow */
+.form-grid {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;    /* center the inner blocks horizontally */
+  gap: 20px !important;
+  width: 100% !important;
+  box-sizing: border-box;
+}
+
+/* Ensure each child (label+input wrapper) becomes a centered block with a limited max width */
+.form-grid > * {
+  width: 100% !important;            /* take available width inside the grid */
+  max-width: 520px !important;       /* control width so it's centered visually */
+  margin: 0 auto !important;         /* center the block */
+  box-sizing: border-box !important;
+  display: block !important;
+}
+
+/* Make inputs span the full width of their wrapper and be visually centered */
+.form-grid input[type="text"],
+.form-grid input[type="email"],
+.form-grid input[type="file"],
+.form-grid .file-input,
+.form-grid select,
+.form-grid textarea {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 8px 0 0 0 !important;     /* keep a little top gap from label */
+  box-sizing: border-box !important;
+  display: block !important;
+}
+
+/* For file input text (browser-specific) keep it inside the wrapper */
+.form-grid input[type="file"]::-webkit-file-upload-button {
+  cursor: pointer;
+}
+
+/* Defensive: if parent card uses extra left padding that visually shifts content,
+   add a small horizontal offset so centered content looks truly centered in the card */
+.profile-card, .profile-card .card-body, .profile-card .card-inner {
+  box-sizing: border-box;
+  /* don't change padding here — only reduce any asymmetric visual shift by centering children */
+}
+
+/* Mobile tweak: narrower max width on small screens */
+@media (max-width: 520px) {
+  .form-grid > * { max-width: calc(100% - 24px) !important; } 
+}
+/* NAVBAR - robust mobile-friendly layout */
+.navbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: rgba(0,0,0,0.18);
+  backdrop-filter: blur(6px);
+  position: relative;
+  z-index: 1200;
+}
+
+/* left group: logo + text */
+.navbar-left {
+  display:flex;
+  align-items:center;
+  gap:12px;
+  min-width: 0; /* allow children to shrink safely */
+}
+
+/* logo image */
+.brand-logo {
+  width:40px;
+  height:40px;
+  border-radius:8px;
+  object-fit:cover;
+  flex: 0 0 auto;
+  box-shadow: 0 6px 14px rgba(0,0,0,0.28);
+}
+
+/* text next to logo – truncate if not enough width */
+.brand-text {
+  font-weight:700;
+  font-size:1.05rem;
+  color:#fff;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  flex: 1 1 auto; /* can shrink if necessary */
+  min-width:0; /* IMPORTANT for preventing overflow/clipping on Android */
+}
+
+/* right group: menu icon */
+.navbar-right {
+  display:flex;
+  align-items:center;
+  gap:12px;
+  flex: 0 0 auto;
+}
+
+/* menu icon */
+.menu-icon {
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  cursor:pointer;
+  padding:8px;
+  background: rgba(255,255,255,0.92);
+  border-radius:10px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+  -webkit-tap-highlight-color: transparent;
+  z-index:1300;
+}
+
+.menu-icon div { width:28px; height:3.6px; background:rgba(10,14,20,0.96); border-radius:3px; }
+
+/* responsive tweaks */
+@media (max-width:420px) {
+  .brand-text { font-size: 0.96rem; }   /* slightly smaller on small phones */
+  .brand-logo { width:36px; height:36px; }
+}
+/* hide text only on extremely narrow screens if necessary */
+@media (max-width:320px) {
+  .brand-text { display:none; }
+}
+
+  
+  </style>
+</head>
+
+<body>
+
+  <!-- NAVBAR (now same animated menu) -->
+ <!-- REPLACE the old navbar block with this -->
+<div class="navbar" role="navigation" aria-label="Main navigation">
+  <div class="navbar-left">
+    <img src="/static/images/logo.png" alt="Task Manager logo" class="brand-logo" />
+    <div class="brand-text">Task Manager</div>
+  </div>
+
+  <div class="navbar-right">
+    <div id="menuIcon" class="menu-icon" aria-label="menu" title="menu">
+      <div></div><div></div><div></div>
+    </div>
+    <nav id="menu" class="menu" aria-hidden="true">
+      <a href="/dashboard">Home</a>
+      <a href="/mytask">My Tasks</a>
+      <a href="/profile">Profile</a>
+      <a href="/about">About</a>
+      <a href="/logout" style="color:#ff6b6b;">Logout</a>
+    </nav>
+  </div>
+</div>
+
+
+  <!-- HEADER -->
+  <header>
+    <h1>Edit Profile</h1>
+    <p>Update your name, email, and avatar</p>
+  </header>
+
+  <!-- EDIT CARD -->
+  <div class="container">
+    <div class="profile-card">
+      <div class="top-row">
+        <div class="avatar-circle">
+          {% if avatar %}
+            <img src="{{ url_for('static', filename='uploads/avatars/' + avatar) }}"
+                 alt="Current avatar"
+                 style="width:100%;height:100%;object-fit:cover;">
+          {% else %}
+            {{ (fullname[:1] if fullname) or 'U' }}
+          {% endif %}
+        </div>
+        <div>
+          <div style="font-size:1.1rem;font-weight:600;">{{ fullname or 'Your name' }}</div>
+          <div style="font-size:0.9rem;color:var(--muted);">{{ email or 'your@email.com' }}</div>
+        </div>
+      </div>
+
+      <form action="{{ url_for('edit_profile') }}" method="POST" enctype="multipart/form-data">
+        <div class="form-grid">
+          <div>
+            <label for="fullname">Full name</label>
+            <input id="fullname" type="text" name="fullname" value="{{ fullname or '' }}" required>
+          </div>
+
+          <div>
+            <label for="email">Email</label>
+            <input id="email" type="email" name="email" value="{{ email or '' }}" required>
+          </div>
+
+          <div>
+            <label for="avatar">Avatar (optional)</label>
+            <input id="avatar" type="file" name="avatar" accept="image/*">
+            <div class="helper">Upload a square image for best results.</div>
+          </div>
+        </div>
+
+        <div class="buttons">
+          <a href="{{ url_for('profile') }}" class="btn-ghost">Cancel</a>
+          <button type="submit" class="btn-primary">Save changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <footer>
+    © 2025 Task Manager
+  </footer>
+
+  <script>
+    // same hamburger/menu behaviour as mytask & profile
+    const menu = document.getElementById('menu'),
+          menuIcon = document.getElementById('menuIcon');
+
+    function openMenu(){
+      menu.classList.add('open');
+      menuIcon.classList.add('open');
+      menu.setAttribute('aria-hidden','false');
+    }
+
+    function closeMenu(){
+      menu.classList.remove('open');
+      menuIcon.classList.remove('open');
+      menu.setAttribute('aria-hidden','true');
+    }
+
+    menuIcon.addEventListener('click', e => {
+      e.stopPropagation();
+      if(menu.classList.contains('open')) closeMenu();
+      else openMenu();
+    });
+
+    document.addEventListener('click', (e)=>{
+      if(!menu.contains(e.target) && !menuIcon.contains(e.target)) closeMenu();
+    });
+
+    document.addEventListener('keydown', (e)=>{
+      if(e.key === 'Escape') closeMenu();
+    });
+
+    document.querySelectorAll('#menu a').forEach(a =>
+      a.addEventListener('click', ()=> closeMenu())
+    );
+  </script>
+</body>
+</html>

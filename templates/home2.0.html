@@ -1,0 +1,762 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Task Management Tool - Dashboard</title>
+<style>
+:root{
+  --accent:#05c396;
+  --muted: rgba(255,255,255,0.92);
+  --card-shadow: 0 20px 44px rgba(6,12,36,0.26);
+  --input-h:56px; --radius:12px; --gap:16px;
+  --panel-pad:22px;
+  --glass: rgba(255,255,255,0.04);
+  --max-narrow: 980px;
+}
+
+/* reset */
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;
+  font-family:Inter, "Poppins", system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+  color:#fff; min-height:100vh; -webkit-font-smoothing:antialiased;
+  background: #071028;
+  overflow-x:hidden;
+}
+
+/* BACKGROUND etc (unchanged) */
+.bg-layer { position:fixed; inset:0; z-index:-3; overflow:hidden; pointer-events:none; }
+.bg-layer img{ width:120%; height:120%; object-fit:cover; transform-origin:center; filter:contrast(.9) saturate(.95) brightness(.86); transform: scale(1.02); }
+.bg-streaks { position:fixed; inset:0; z-index:-2; pointer-events:none; background:linear-gradient(90deg, rgba(255,255,255,0.00), rgba(255,255,255,0.008), rgba(255,255,255,0.00)); mix-blend-mode: overlay; opacity:0.28; background-size: 60% 2px; animation: streaksMove 30s linear infinite; }
+@keyframes streaksMove { from{ background-position: 0 10%; } to{ background-position: 100% 90%; } }
+.bg-overlay { position:fixed; inset:0; background: linear-gradient(180deg, rgba(3,8,20,0.40), rgba(2,6,20,0.56)); z-index:-1; pointer-events:none; }
+
+/* NAVBAR & MENU (unchanged) */
+.navbar{ display:flex; align-items:center; justify-content:space-between; padding:12px 20px; background: rgba(0,0,0,0.18); backdrop-filter: blur(6px); position:relative; z-index:1200; }
+.brand{ font-weight:700; font-size:1.05rem; letter-spacing:0.4px; color:#fff; }
+.menu-icon{ display:flex; flex-direction:column; gap:6px; cursor:pointer; padding:8px; z-index:1400; background: rgba(255,255,255,0.92); border-radius:10px; box-shadow: 0 6px 18px rgba(0,0,0,0.25); -webkit-tap-highlight-color: transparent; }
+.menu-icon div{ width:28px; height:3.6px; background:rgba(10,14,20,0.96); border-radius:3px; transition: transform .18s ease, opacity .18s ease; transform-origin:center; }
+.menu{ position:absolute; right:20px; top:calc(100% + 12px); width:220px; background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(250,250,250,0.95)); border-radius:12px; padding:8px; box-shadow:var(--card-shadow); transform-origin: top right; transform: translateY(-8px) scale(.98); opacity:0; pointer-events:none; transition: opacity .22s ease, transform .22s cubic-bezier(.2,9,2,1); z-index:1300; }
+.menu.open{ transform: translateY(0) scale(1); opacity:1; pointer-events:auto; }
+.menu a{ color: rgba(10,20,30,0.94); text-decoration:none; padding:10px 12px; font-weight:700; border-radius:8px; margin:4px; display:block; }
+.menu a:hover{ background: rgba(8,14,24,0.06); transform:translateX(4px); transition: transform .12s, background .12s; }
+.menu-icon.open > div:nth-child(1){ transform: translateY(6px) rotate(45deg); background:rgba(10,14,20,0.96); }
+.menu-icon.open > div:nth-child(2){ opacity: 0; transform: scaleX(0); }
+.menu-icon.open > div:nth-child(3){ transform: translateY(-6px) rotate(-45deg); background:rgba(10,14,20,0.96); }
+
+/* HEADER */
+.header{ text-align:center; padding:36px 12px 6px; z-index:20; position:relative; }
+.header h1{ margin:0; font-size:2.2rem; font-weight:900; text-shadow:0 12px 40px rgba(2,6,20,0.6); letter-spacing:0.6px }
+.header p{ margin:8px 0 0; color: rgba(255,255,255,0.9); font-weight:600; }
+
+/* MAIN WRAP */
+.wrap{ width:92%; max-width:1180px; margin:22px auto 80px; position:relative; z-index:10; }
+
+/* ADD PANEL */
+.add-panel{
+  background: linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.03));
+  padding:var(--panel-pad); border-radius:var(--radius); box-shadow:0 26px 64px rgba(3,8,32,0.42);
+  display:grid; grid-template-columns: 1fr 1fr 220px 180px; gap: var(--gap); align-items:center;
+  perspective: 1200px; position:relative; overflow:visible;
+  border: 1px solid rgba(255,255,255,0.06);
+  backdrop-filter: blur(6px);
+}
+@media (max-width:980px){ .add-panel{ grid-template-columns:1fr; padding:18px; } }
+
+/* ctrl / holo (unchanged except small padding tweak) */
+.ctrl{
+  position:relative; height:var(--input-h); display:flex; align-items:center;
+  transform-style:preserve-3d;
+  transition: transform .28s cubic-bezier(.2,9,2,1), box-shadow .3s ease;
+  will-change: transform, box-shadow;
+  -webkit-tap-highlight-color: transparent;
+}
+.ctrl .holo {
+  width:100%;
+  height:100%;
+  border-radius:12px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(247,247,250,0.96));
+  box-shadow: 0 12px 30px rgba(4,10,30,0.14), inset 0 1px 0 rgba(255,255,255,0.6);
+  display:flex; align-items:center; padding:12px 36px 12px 14px;
+  color:#111;
+  transform: translateZ(0px) rotateX(0deg) rotateY(0deg);
+  transition: transform .18s ease, box-shadow .18s ease, filter .18s ease;
+  overflow: visible;           /* <-- changed to visible so emoji/dropdowns are not clipped */
+  z-index: 1;                  /* keep it above background but below popovers */
+}
+
+
+
+/* small screens */
+@media (max-width:600px){
+  .ctrl{ height:48px; }
+  .ctrl .holo{ border-radius:10px; padding:10px 14px; box-shadow: 0 8px 20px rgba(4,10,30,0.12); }
+  .add-panel{ gap:12px; }
+}
+
+/* inputs inside holo */
+/* make inputs/textarea full-height so placeholder is vertically consistent */
+.ctrl input[type="text"], .ctrl input[type="date"], .ctrl select, .ctrl textarea {
+  width:100%; height:100%; border-radius:8px; border:none; font-size:14px;
+  color:#111; background:transparent; outline:none; resize:none; box-sizing:border-box;
+  font-weight:600;
+  padding: 0; /* let the holo padding handle spacing */
+  line-height: 1.1;
+}
+/* --- main change: ensure textarea placeholder sits vertically centered visually --- */
+.ctrl textarea{
+  min-height:88px;
+  padding-top:18px; /* pushes placeholder a little down to be visually centered in the holo */
+  box-shadow: none;
+  border: none;
+  background: transparent;
+  line-height: 1.18;
+}
+
+/* placeholder style - subtle and centered vertically */
+.ctrl textarea::placeholder{
+  color: rgba(34,34,34,0.36);
+  font-weight:700;
+  /* larger line-height helps center visually */
+  line-height: 1.3;
+}
+
+/* FORCE full-black placeholder color */
+.ctrl input::placeholder,
+.ctrl textarea::placeholder {
+    color: #111 !important;   
+    opacity: 1 !important;    /* Safari fix */
+    font-weight: 700;
+}
+
+
+/* hover/tilt behaviour */
+@media (hover:hover) and (pointer: fine) {
+  .ctrl:hover, .ctrl:focus-within {
+    transform: translateY(-6px) scale(1.01);
+    box-shadow: 0 34px 70px rgba(2,8,30,0.28);
+  }
+  .ctrl:hover .holo, .ctrl:focus-within .holo {
+    transform: translateZ(16px) rotateX(2deg) rotateY(-3deg);
+    box-shadow: 0 20px 46px rgba(4,10,30,0.22), inset 0 1px 0 rgba(255,255,255,0.45);
+    filter: saturate(1.02);
+  }
+}
+
+/* date display - unchanged except hidden date picker overlay (moved from offscreen) */
+.date-display {
+  width:100%;
+  padding-right:44px;
+  cursor:pointer;
+  background: transparent;
+  color: #333;
+  border-radius:6px;
+  height:100%;
+  display:block;
+  line-height:1.1;
+}
+
+/* --- KEY CHANGE: Instead of placing the real date input offscreen we overlay it on the visible display.
+     This makes the native browser date-picker open anchored to the visible box rather than to some offscreen input. --- */
+#taskDatePicker{
+  position:absolute;
+  inset:0;                 /* cover the holo cell */
+  width:100%;
+  height:100%;
+  opacity:0;               /* invisible but clickable/focusable */
+  cursor:pointer;
+  border:none;
+  background:transparent;
+  z-index:2;
+}
+
+/* Priority select (unchanged) */
+.priority-wrap { position:relative; width:100%; height:100%; display:flex; align-items:center; }
+/* shrink only emojis inside the select (Safari-friendly) */
+.priority-wrap select {
+    font-size: 18px !important;   /* smaller emoji + text */
+    line-height: 48px !important;
+}
+
+.priority-wrap select option {
+    font-size: 18px !important;   /* option list too */
+}
+
+.priority-wrap::after{ content: "▾"; position:absolute; right:12px; top:50%; transform:translateY(-50%); font-size:13px; color:#444; pointer-events:none; }
+.priority-wrap { overflow: visible; }
+
+/* add button */
+.add-button-wrap{ grid-column:1 / -1; display:flex; justify-content:center; margin-top:6px; }
+.btn-add{ background: linear-gradient(180deg,var(--accent), #02a676); color:#fff; border:none; padding:12px 22px; border-radius:12px; font-weight:800; cursor:pointer; height:48px; box-shadow: 0 18px 36px rgba(2,8,20,0.25); transition: transform .18s cubic-bezier(.2,9,2,1), box-shadow .18s; }
+.btn-add:hover{ transform: translateY(-6px) scale(1.02); box-shadow: 0 26px 48px rgba(2,8,20,0.30); }
+
+/* rest unchanged... (task list, popovers, filters) */
+.filter-row{ display:flex; justify-content:flex-end; gap:12px; margin-top:18px; align-items:center; }
+.filter-row label{ margin-right:8px; font-weight:700; color:var(--muted); }
+.filter-row select{ padding:8px 10px; border-radius:10px; border:none; background:#fff; color:#222; font-weight:700 }
+.tasks{ margin-top:18px; display:grid; gap:14px; }
+.task-card{ background: linear-gradient(180deg, rgba(255,255,255,0.066), rgba(255,255,255,0.028)); border-radius:12px; padding:14px; box-shadow: 0 14px 36px rgba(6,10,30,0.24); transform:translateY(0); transition: transform .22s cubic-bezier(.2,9,2,1), box-shadow .22s, opacity .22s; will-change: transform, opacity; opacity:1; border: 1px solid rgba(255,255,255,0.04); backdrop-filter: blur(4px); }
+.task-card.hidden{ opacity:0; transform:translateY(8px); }
+.task-card.visible{ opacity:1; transform:translateY(0); }
+.task-card:hover{ transform:translateY(-6px); box-shadow:0 30px 64px rgba(6,12,40,0.32); }
+.task-row{ display:flex; justify-content:space-between; gap:12px; align-items:flex-start; }
+.task-title{ margin:0; font-weight:800; font-size:1.05rem; color:#fff; }
+.task-desc{ margin:6px 0 0; color: rgba(255,255,255,0.94); }
+.task-meta{ margin-top:8px; color: rgba(255,255,255,0.86); font-size:13px; }
+.task-actions{ display:flex; gap:8px; align-items:center; }
+.btn{ border:none; padding:8px 10px; border-radius:10px; font-weight:700; cursor:pointer; }
+.btn-toggle{ background:#ffd166; color:#111; }
+.btn-delete{ background:#ff6b6b; color:#fff; }
+.bell-btn{ background:transparent; border:none; font-size:20px; cursor:pointer; padding:6px; border-radius:8px; color:#ffdd57; box-shadow:none; }
+.reminder-line{ margin-top:8px; font-size:13px; color: rgba(255,255,255,0.9); }
+/* reminder popover: position fixed so it's always relative to viewport (mobile friendly) */
+/* reminder popover: fixed & mobile-friendly */
+/* reminder popover: use absolute positioning (appended to body) */
+.reminder-popover {
+  position: absolute;              /* use absolute and compute page coords in JS */
+  min-width: 260px;
+  border-radius: 10px;
+  box-shadow: 0 12px 40px rgba(6,12,40,0.36);
+  background: #fff;
+  color: #111;
+  z-index: 999999;
+  padding: 12px;
+  transform-origin: top left;
+  max-width: calc(100vw - 24px);
+  box-sizing: border-box;
+  will-change: left, top, width;
+}
+
+
+
+
+/* bell jiggle animation */
+@keyframes bell-jiggle {
+  0%   { transform: rotate(0deg); }
+  12%  { transform: rotate(14deg); }
+  24%  { transform: rotate(-10deg); }
+  40%  { transform: rotate(8deg); }
+  60%  { transform: rotate(-6deg); }
+  80%  { transform: rotate(4deg); }
+  100% { transform: rotate(0deg); }
+}
+
+/* class to trigger the animation */
+.bell-jiggle {
+  animation: bell-jiggle 820ms cubic-bezier(.2,.8,.2,1);
+  transform-origin: 50% 12%; /* pivot near the top center of the icon */
+  will-change: transform;
+}
+
+
+/* mobile tweaks */
+@media (max-width:600px){
+  .wrap{ margin:12px auto 80px; }
+  .header{ padding:20px 8px 8px; }
+  .header h1{ font-size:1.4rem; }
+  .add-panel{ grid-template-columns:1fr; padding:14px; gap:12px; border-radius:14px; }
+  .ctrl{ height:52px; }
+  .ctrl textarea{ min-height:72px; padding-top:14px; }
+  .priority-wrap select{ height:48px; padding:10px 36px 10px 12px; font-size:15px; }
+  .btn-add{ height:52px; padding:14px; font-size:16px; border-radius:12px; }
+  .task-row{ flex-direction:column; align-items:flex-start; gap:10px; }
+  .task-actions{ width:100%; display:flex; justify-content:space-between; }
+  .menu{ right:12px; top:54px; width:200px; }
+  .task-card, .add-panel, .ctrl .holo { box-shadow: 0 10px 28px rgba(3,6,24,0.28); }
+}
+
+/* NAVBAR - robust mobile-friendly layout */
+.navbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: rgba(0,0,0,0.18);
+  backdrop-filter: blur(6px);
+  position: relative;
+  z-index: 1200; /* keep above page background */
+}
+
+/* left group: logo + text */
+.navbar-left {
+  display:flex;
+  align-items:center;
+  gap:12px;
+  min-width: 0; /* allow children to shrink safely */
+}
+
+/* logo image */
+.brand-logo {
+  width:40px;
+  height:40px;
+  border-radius:8px;
+  object-fit:cover;
+  flex: 0 0 auto;
+  box-shadow: 0 6px 14px rgba(0,0,0,0.28);
+}
+
+/* text next to logo – truncate if not enough width */
+.brand-text {
+  font-weight:700;
+  font-size:1.05rem;
+  color:#fff;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  flex: 1 1 auto; /* can shrink if necessary */
+  min-width:0;
+}
+
+/* right group: menu icon + nav */
+.navbar-right {
+  display:flex;
+  align-items:center;
+  gap:12px;
+  flex: 0 0 auto;
+}
+
+/* ensure menu icon stays top-right */
+.menu-icon {
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  cursor:pointer;
+  padding:8px;
+  background: rgba(255,255,255,0.92);
+  border-radius:10px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+  -webkit-tap-highlight-color: transparent;
+  z-index:1300;
+}
+
+/* small bars inside menu icon */
+.menu-icon div { width:28px; height:3.6px; background:rgba(10,14,20,0.96); border-radius:3px; }
+
+/* menu dropdown (unchanged appearance) */
+.menu { position: absolute; right: 16px; top: calc(100% + 12px); width:220px; background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(250,250,250,0.95)); border-radius:12px; padding:8px; box-shadow:var(--card-shadow); transform-origin: top right; transform: translateY(-8px) scale(.98); opacity:0; pointer-events:none; transition: opacity .22s ease, transform .22s cubic-bezier(.2,9,2,1); z-index:1300; }
+
+/* when open */
+.menu.open{ transform: translateY(0) scale(1); opacity:1; pointer-events:auto; }
+
+/* responsive tweaks */
+@media (max-width:420px) {
+  .brand-text { font-size: 0.96rem; }   /* slightly smaller on small phones */
+  .brand-logo { width:36px; height:36px; }
+}
+/* hide text only on extremely narrow screens if necessary */
+@media (max-width:320px) {
+  .brand-text { display:none; }
+}
+
+
+
+</style>
+</head>
+<body>
+  <div class="bg-layer"><img id="bgImg" src="/static/images/background_img3.png" alt="background"></div>
+  <div class="bg-streaks" aria-hidden="true"></div>
+  <div class="bg-overlay" aria-hidden="true"></div>
+
+  <!-- REPLACE your current navbar block with this -->
+<!-- START: REPLACED NAVBAR -->
+<div class="navbar" role="navigation" aria-label="Main navigation">
+  <div class="navbar-left">
+    <img src="/static/images/logo.png" alt="Task Manager logo" class="brand-logo" />
+    <div class="brand-text">Task Manager</div>
+  </div>
+
+  <div class="navbar-right">
+    <div id="menuIcon" class="menu-icon" aria-label="menu" title="menu">
+      <div></div><div></div><div></div>
+    </div>
+    <nav id="menu" class="menu" aria-hidden="true">
+      <a href="/dashboard">Home</a>
+      <a href="/mytask">My Tasks</a>
+      <a href="/profile">Profile</a>
+      <a href="/about">About</a>
+      <a href="/logout" style="color:#ff6b6b;">Logout</a>
+    </nav>
+  </div>
+</div>
+<!-- END: REPLACED NAVBAR -->
+
+
+ <div class="header" style="display:flex; flex-direction:column; align-items:center; gap:10px;">
+
+    <!-- Avatar -->
+    <img 
+        src="{{ url_for('static', filename='uploads/avatars/' ~ avatar) if avatar else url_for('static', filename='images/default_avatar.png') }}"
+        alt="User avatar"
+        style="
+            width:85px; 
+            height:85px; 
+            border-radius:50%; 
+            object-fit:cover; 
+            box-shadow:0 8px 20px rgba(0,0,0,0.35);
+            border:3px solid rgba(255,255,255,0.45);
+        "
+    >
+
+    <h1 style="margin:0;">Welcome {{ username }}</h1>
+    <p>Plan your day — priorities, due dates and progress.</p>
+</div>
+
+
+  <main class="wrap">
+    <section class="add-panel" aria-label="Add task">
+      <!-- Title -->
+      <div class="ctrl" data-role="holo-input">
+        <div class="holo">
+          <input id="taskTitle" type="text" placeholder="Task title." aria-label="Task title">
+        </div>
+      </div>
+
+      <!-- Description -->
+      <div class="ctrl" data-role="holo-input">
+        <div class="holo">
+          <!-- textarea placeholder centered slightly down via CSS padding-top -->
+          <textarea id="taskDesc" placeholder="Task description (optional)." aria-label="Task description"></textarea>
+        </div>
+      </div>
+
+      <!-- DATE (important change: date input moved INSIDE the holo so native popup anchors correctly) -->
+      <div class="ctrl" style="align-items:center;" data-role="holo-input">
+        <div class="holo" style="position:relative;">
+          <input id="taskDateDisplay" class="date-display" type="text" placeholder="Due (dd/mm/yyyy)" readonly aria-label="Due date (dd/mm/yyyy)">
+          <span class="icon-right" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 11h10M7 16h10M3 7h18M7 3v4M17 3v4" stroke="#333" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+
+          <!-- moved the real date input here and made it overlay the holo (invisible) so native picker is anchored correctly -->
+          <input id="taskDatePicker" type="date" aria-label="Pick due date">
+        </div>
+      </div>
+
+      <!-- PRIORITY -->
+      <div class="ctrl" style="align-items:center;" data-role="holo-input">
+        <div class="holo" style="position:relative;">
+          <div class="priority-wrap" style="width:100%;">
+            <select id="taskPriority" aria-label="Priority">
+              <option value="High">🔴 High</option>
+              <option value="Medium">🟡 Medium</option>
+              <option value="Low"  selected>🟢 Low</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="add-button-wrap">
+        <button id="addBtn" class="btn-add" type="button">Add Task</button>
+      </div>
+    </section>
+
+    <div class="filter-row" role="region" aria-label="Task filters">
+      <label for="statusFilter">Filter:</label>
+      <select id="statusFilter" aria-label="Filter tasks">
+        <option value="All">All</option>
+        <option value="Pending">Pending</option>
+        <option value="Completed">Completed</option>
+      </select>
+    </div>
+
+    <section id="tasksContainer" class="tasks" aria-live="polite"></section>
+  </main>
+
+<script>
+/* --- MENU TOGGLE --- */
+const menu = document.getElementById('menu');
+const menuIcon = document.getElementById('menuIcon');
+function closeMenu(){ menu.classList.remove('open'); menuIcon.classList.remove('open'); menu.setAttribute('aria-hidden','true'); }
+function openMenu(){ menu.classList.add('open'); menuIcon.classList.add('open'); menu.setAttribute('aria-hidden','false'); }
+menuIcon.addEventListener('click', (e) => { e.stopPropagation(); if(menu.classList.contains('open')) closeMenu(); else openMenu(); });
+document.addEventListener('click', (e) => { if(!menu.contains(e.target) && !menuIcon.contains(e.target)) closeMenu(); });
+document.addEventListener('keydown', (e) => { if(e.key === 'Escape') closeMenu(); });
+document.querySelectorAll('#menu a').forEach(a => a.addEventListener('click', () => closeMenu()));
+
+/* --- DATE PICKER / DISPLAY --- */
+const dateDisplay = document.getElementById('taskDateDisplay');
+const datePicker  = document.getElementById('taskDatePicker');
+function isoToDDMMYYYY(iso){
+  if(!iso) return '';
+  const [y,m,d] = iso.split('-'); if(!y||!m||!d) return iso;
+  return `${d}/${m}/${y}`;
+}
+
+/* click the visible display — delegate to the actual date input.
+   Because the date input now sits *on top of* the holo (opacity 0), some browsers will open the native picker automatically
+   when the input receives focus. We still provide a helper for showPicker if available. */
+if(dateDisplay){
+  dateDisplay.addEventListener('click', () => {
+    if(datePicker && typeof datePicker.showPicker === 'function') {
+      datePicker.showPicker();
+    } else if(datePicker){
+      // ensure input receives focus and opens
+      datePicker.focus();
+      // some browsers require a click event:
+      try { datePicker.click(); } catch(e){ /* ignore */ }
+    }
+  });
+}
+
+/* update visible display when the actual input changes */
+if(datePicker){
+  datePicker.addEventListener('change', () => { const iso = datePicker.value; dateDisplay.value = isoToDDMMYYYY(iso); });
+  datePicker.addEventListener('input', () => { if(!datePicker.value) dateDisplay.value = ''; });
+}
+
+/* --- parallax/tilt behaviour (unchanged) --- */
+const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0 || navigator.msMaxTouchPoints > 0;
+const panel = document.querySelector('.add-panel');
+const holoInputs = Array.from(document.querySelectorAll('[data-role="holo-input"]'));
+const bgImg = document.getElementById('bgImg');
+if(panel && !isTouch){
+  panel.addEventListener('mousemove', (e) => {
+    const rect = panel.getBoundingClientRect();
+    const cx = rect.left + rect.width/2;
+    const cy = rect.top + rect.height/2;
+    const rx = (e.clientX - cx) / rect.width;
+    const ry = (e.clientY - cy) / rect.height;
+    holoInputs.forEach((el, idx) => {
+      const depth = 10 + idx*1;
+      const rotY = rx * 5;
+      const rotX = -ry * 3.5;
+      const inner = el.querySelector('.holo');
+      if(inner){
+        inner.style.transform = `translateZ(${depth}px) rotateX(${rotX}deg) rotateY(${rotY}deg)`;
+      }
+    });
+    if(bgImg){
+      const bx = rx * 0.25;
+      const by = ry * -0.25;
+      bgImg.style.transform = `translate(${bx}%, ${by}%) scale(1.02)`;
+    }
+  });
+  panel.addEventListener('mouseleave', () => {
+    holoInputs.forEach(el => { const inner = el.querySelector('.holo'); if(inner) inner.style.transform = ''; });
+    if(bgImg) bgImg.style.transform = 'scale(1.02)';
+  });
+} else {
+  if(bgImg) bgImg.style.transform = 'scale(1.02)';
+}
+
+/* --- TASKS (unchanged) --- */
+/* ... renderTasks, addTaskHandler etc. (kept exactly as your original implementation) ... */
+
+async function loadTasks(){
+  try{
+    const res = await fetch('/get_tasks');
+    if(!res.ok){ console.error('/get_tasks failed', await res.text()); document.getElementById('tasksContainer').innerHTML = '<div class="no-tasks">Unable to load tasks (see console).</div>'; return; }
+    const tasks = await res.json();
+    renderTasks(tasks);
+  } catch(err){ console.error('loadTasks error', err); document.getElementById('tasksContainer').innerHTML = '<div class="no-tasks">Error loading tasks (see console).</div>'; }
+}
+function escapeHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function renderTasks(tasks){
+  const container = document.getElementById('tasksContainer'); container.innerHTML = '';
+  const filter = document.getElementById('statusFilter') ? document.getElementById('statusFilter').value : 'All';
+  let list = (tasks || []).slice();
+  if(filter !== 'All') list = list.filter(t => t.status === filter);
+  if(list.length === 0){ container.innerHTML = '<div class="no-tasks">No tasks yet — add your first task above.</div>'; return; }
+  list.forEach((task, i) => {
+    const card = document.createElement('div'); card.className = 'task-card hidden';
+    const bellHtml = `<div class="reminder-wrap" style="position:relative;"><button class="bell-btn" title="Set reminder" aria-label="Set reminder">🔔</button></div>`;
+    card.innerHTML = `
+      <div class="task-row">
+        <div style="flex:1">
+          <p class="task-title">${escapeHtml(task.title)}</p>
+          ${task.description ? `<p class="task-desc">${escapeHtml(task.description)}</p>` : ''}
+          <div class="task-meta">${escapeHtml(task.priority || 'Medium')} • ${task.due_date ? 'Due: ' + escapeHtml(task.due_date) : 'No due date'} • ${escapeHtml(task.status)}</div>
+          ${task.reminder_at ? `<div class="reminder-line">🔔 Reminder: ${escapeHtml(task.reminder_at)}</div>` : ''}
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;">
+          <div class="task-actions" style="display:flex;gap:8px;">
+            <button class="btn btn-toggle">${task.status === 'Completed' ? 'Mark Pending' : 'Mark Completed'}</button>
+            <button class="btn btn-delete">Delete</button>
+            ${bellHtml}
+          </div>
+        </div>
+      </div>
+    `;
+    card.querySelector('.btn-toggle').addEventListener('click', async () => {
+      try{ const r = await fetch('/toggle_task/' + task.id, { method:'POST' }); if(!r.ok){ console.error('toggle failed', await r.text()); return; } loadTasks(); } catch(e){ console.error(e); }
+    });
+    card.querySelector('.btn-delete').addEventListener('click', async () => {
+      if(!confirm('Delete this task?')) return;
+      try{ const r = await fetch('/delete_task/' + task.id, { method:'DELETE' }); if(!r.ok){ console.error('delete failed', await r.text()); return; } loadTasks(); } catch(e){ console.error(e); }
+    });
+    container.appendChild(card);
+    setTimeout(() => requestAnimationFrame(() => card.classList.replace('hidden','visible')), 40 * i);
+
+        const bellBtn = card.querySelector('.bell-btn');
+    if (bellBtn) {
+      bellBtn.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+
+        // --- animate the bell immediately ---
+        bellBtn.classList.remove('bell-jiggle');    // remove in case it's already there
+        void bellBtn.offsetWidth;
+        bellBtn.classList.add('bell-jiggle');
+        try { if (navigator.vibrate) navigator.vibrate(40); } catch (err) {}
+        bellBtn.addEventListener('animationend', function _onAnimEnd() {
+          bellBtn.classList.remove('bell-jiggle');
+          bellBtn.removeEventListener('animationend', _onAnimEnd);
+        });
+
+        // --- then open the reminder popover as before ---
+        let initialISO = '';
+        if (task.reminder_at) {
+          const s = task.reminder_at.replace(' ', 'T');
+          initialISO = s.slice(0,16);
+        }
+        showReminderPopover(bellBtn, task.id, initialISO);
+      });
+    }
+
+  }); // <-- CLOSE list.forEach
+}   // <-- CLOSE renderTasks
+
+
+
+async function addTaskHandler(){
+  const title = document.getElementById('taskTitle').value.trim();
+  const description = document.getElementById('taskDesc').value.trim();
+  const due_iso = datePicker ? (datePicker.value || null) : null;
+  const priority = document.getElementById('taskPriority').value || 'Medium';
+  if(!title){ alert('Please enter a task title'); return; }
+  try{
+    const res = await fetch('/add_task', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({ title, description, due_date: due_iso, priority })
+    });
+    if(!res.ok){ console.error('/add_task failed', await res.text()); alert('Unable to add task (see console)'); return; }
+    document.getElementById('taskTitle').value=''; document.getElementById('taskDesc').value=''; if(datePicker){ datePicker.value=''; if(dateDisplay) dateDisplay.value=''; }
+    document.getElementById('taskPriority').value='Medium';
+    loadTasks();
+    const btn = document.getElementById('addBtn'); btn.animate([{ transform:'scale(1)' }, { transform:'scale(.96)' }, { transform:'scale(1)' }], { duration:240 });
+  } catch(err){ console.error('addTask error', err); alert('Error adding task (see console).'); }
+}
+
+/* reminder popover (unchanged) */
+function showReminderPopover(triggerEl, taskId, initialDateISO = '') {
+  // remove existing popover
+  const ex = document.querySelector('.reminder-popover'); if (ex) ex.remove();
+
+  // create popover element (absolute; we'll compute left/top on the page)
+  const pop = document.createElement('div');
+  pop.className = 'reminder-popover';
+  pop.style.left = '0px';
+  pop.style.top  = '0px';
+  pop.innerHTML = `
+    <div style="font-weight:700;margin-bottom:8px">Set reminder</div>
+    <input id="reminderInput" type="datetime-local" style="width:100%;padding:8px;border-radius:8px;border:1px solid #e6e6e6" value="${initialDateISO || ''}" />
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">
+      <button id="remSave" class="btn" style="background:${getComputedStyle(document.documentElement).getPropertyValue('--accent') || '#05c396'};color:#fff;border-radius:8px;padding:8px 10px">Save</button>
+      <button id="remClear" class="btn" style="background:#ff6b6b;color:#fff;border-radius:8px;padding:8px 10px">Clear</button>
+    </div>
+  `;
+  // append to body (so it's not inside any transformed ancestor)
+  document.body.appendChild(pop);
+
+  // position on next frame after layout so sizes are correct (Safari-friendly)
+  requestAnimationFrame(() => {
+    // measure trigger and pop
+    const rect = triggerEl.getBoundingClientRect();
+    const popRect = pop.getBoundingClientRect();
+
+    // compute page coordinates (account for scroll)
+    const leftPage = rect.left + window.scrollX;
+    let topPage = rect.bottom + window.scrollY + 8; // desired gap
+
+    // clamp width to viewport max (leave margin)
+    const docWidth = Math.max(document.documentElement.clientWidth, window.innerWidth || 0);
+    const maxAllowed = docWidth - 24;
+    let popW = Math.min(popRect.width || 260, maxAllowed);
+    pop.style.width = Math.round(popW) + 'px';
+
+    // compute left so pop doesn't overflow right
+    let left = leftPage;
+    if (left + popW > window.scrollX + docWidth - 12) {
+      left = Math.max(window.scrollX + 12, window.scrollX + docWidth - popW - 12);
+    }
+    if (left < window.scrollX + 12) left = window.scrollX + 12;
+
+    // flip above the trigger if it would go off the bottom
+    const popH = pop.getBoundingClientRect().height;
+    const docHeight = Math.max(document.documentElement.clientHeight, window.innerHeight || 0);
+    const viewportBottom = window.scrollY + docHeight;
+    if (topPage + popH > viewportBottom - 12) {
+      const above = rect.top + window.scrollY - popH - 8;
+      if (above >= window.scrollY + 12) topPage = above;
+      else topPage = Math.max(window.scrollY + 12, viewportBottom - popH - 12);
+    }
+
+    pop.style.left = Math.round(left) + 'px';
+    pop.style.top  = Math.round(topPage) + 'px';
+  });
+
+  // cleanup helpers
+  function cleanup() { document.removeEventListener('click', onDocClick); document.removeEventListener('keydown', onEsc); if (pop) pop.remove(); }
+  function onDocClick(e) { if (!pop.contains(e.target) && e.target !== triggerEl) cleanup(); }
+  function onEsc(e) { if (e.key === 'Escape') cleanup(); }
+
+  document.addEventListener('click', onDocClick);
+  document.addEventListener('keydown', onEsc);
+
+  // wire buttons
+  pop.querySelector('#remSave').addEventListener('click', async () => {
+    const val = document.getElementById('reminderInput').value;
+    if (!val) { alert('Pick a date/time'); return; }
+    try{
+      const res = await fetch('/set_reminder/' + taskId, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reminder_at: val })
+      });
+      if (!res.ok) { console.error(await res.text()); alert('Failed to save reminder'); return; }
+      cleanup(); await loadTasks();
+    } catch (err) { console.error(err); alert('Error saving reminder (see console)'); }
+  });
+
+  pop.querySelector('#remClear').addEventListener('click', async () => {
+    if (!confirm('Clear reminder for this task?')) return;
+    try{
+      const res = await fetch('/clear_reminder/' + taskId, { method: 'POST' });
+      if (!res.ok) { console.error(await res.text()); alert('Failed to clear'); return; }
+      cleanup(); await loadTasks();
+    } catch (err) { console.error(err); alert('Error clearing reminder (see console)'); }
+  });
+}
+
+
+
+
+
+/* focus glow accessibility (unchanged) */
+document.querySelectorAll('[data-role="holo-input"] .holo input, [data-role="holo-input"] .holo textarea, [data-role="holo-input"] .holo select').forEach(el=>{
+  el.addEventListener('focus', (e) => {
+    const parent = e.target.closest('[data-role="holo-input"]');
+    if(parent) parent.classList.add('focused');
+  });
+  el.addEventListener('blur', (e) => {
+    const parent = e.target.closest('[data-role="holo-input"]');
+    if(parent) parent.classList.remove('focused');
+  });
+});
+
+/* initialize */
+document.addEventListener('DOMContentLoaded', () => {
+  const addBtn = document.getElementById('addBtn');
+  if(addBtn) addBtn.addEventListener('click', addTaskHandler);
+  const statusFilter = document.getElementById('statusFilter');
+  if(statusFilter) statusFilter.addEventListener('change', loadTasks);
+  loadTasks();
+});
+
+
+</script>
+</body>
+</html>

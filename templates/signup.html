@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Create Account — Task Management Tool</title>
+<style>
+:root{
+  --bg1:#071029; --bg2:#0b1630; --accent:#06b981; --muted:#94a3b8;
+  --card-radius:14px;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0; font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+  -webkit-font-smoothing:antialiased; background: linear-gradient(180deg,var(--bg1),var(--bg2));
+  color:#fff; display:flex; align-items:center; justify-content:center; padding:24px; overflow:auto;
+}
+
+/* Background layer (same as login page) */
+.bg-layer{ position:fixed; inset:0; z-index:-2; overflow:hidden; pointer-events:none; }
+.bg-layer img{ width:120%; height:120%; object-fit:cover; filter:brightness(.6) saturate(.95); transform-origin:center; animation:slowFloat 22s ease-in-out infinite alternate; }
+@keyframes slowFloat{ from{ transform:translateY(0) scale(1) } to{ transform:translateY(-28px) scale(1.05) } }
+.grain{ position:fixed; inset:0; background-image:radial-gradient(rgba(255,255,255,0.02) 1px, transparent 1px); background-size:6px 6px; opacity:0.32; z-index:-1; pointer-events:none; }
+
+/* Card */
+.container{
+  width:100%; max-width:980px; display:grid; grid-template-columns: 1fr 420px; gap:28px;
+  align-items:start;
+  padding:28px;
+}
+@media (max-width:980px){ .container{ grid-template-columns: 1fr; padding:18px } }
+
+.left-panel{
+  color:#fff;
+  padding:18px;
+}
+.brand{ display:flex; gap:12px; align-items:center; margin-bottom:8px }
+.brand .logo{ width:48px; height:48px; border-radius:10px; background:#fff; color:#071029; display:flex; align-items:center; justify-content:center; font-weight:800 }
+h1{ font-size:28px; margin:8px 0 8px }
+.lead{ color:var(--muted); margin:0 0 18px }
+
+/* Signup card (right) */
+.card{
+  background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02));
+  color:#fff; padding:22px; border-radius:12px; box-shadow:0 20px 50px rgba(2,6,23,0.6); backdrop-filter: blur(8px);
+  position:relative;
+  /* ensure the card is above background and left-panel on mobile */
+  z-index: 2;
+}
+
+/* wizard steps header */
+.steps{
+  display:flex; gap:8px; margin-bottom:12px; align-items:center; justify-content:center;
+}
+.step{
+  padding:8px 10px; border-radius:10px; background:rgba(255,255,255,0.02); color:var(--muted); font-weight:700; font-size:13px;
+}
+.step.active{ background:linear-gradient(90deg,var(--accent), #03956d); color:#fff; transform:translateY(-3px); box-shadow:0 10px 30px rgba(2,8,20,0.28); }
+
+/* form layout */
+form{ display:block; }
+.field{ margin-bottom:12px; }
+label{ display:block; font-weight:700; color:#cbd5e1; font-size:13px; margin-bottom:6px; }
+input[type="text"], input[type="email"], input[type="password"], select, textarea {
+  width:100%; padding:12px 14px; border-radius:10px; border:none; font-size:14px; outline:none; box-shadow:0 8px 22px rgba(0,0,0,0.12);
+  background:#fff; color:#071029;
+}
+textarea{ min-height:96px; resize:vertical; padding-top:12px; }
+
+/* inline error */
+.error{
+  color:#ffb3b3; font-size:13px; margin-top:6px; display:none;
+}
+/* visible error */
+.error.show{ display:block; }
+
+/* avatar upload UI */
+.avatar-row{ display:flex; gap:12px; align-items:center; margin-bottom:12px; }
+.avatar-preview{
+  width:72px; height:72px; border-radius:16px; background:linear-gradient(180deg,#f7f7f7,#fff);
+  display:flex; align-items:center; justify-content:center; overflow:hidden; box-shadow:0 8px 30px rgba(0,0,0,0.18);
+}
+.avatar-preview img{ width:100%; height:100%; object-fit:cover }
+
+/* small helper text */
+.helper{ color:var(--muted); font-size:13px; margin-top:6px }
+
+/* controls row */
+.controls{ display:flex; gap:10px; justify-content:space-between; align-items:center; margin-top:8px; }
+.btn{
+  padding:10px 14px; border-radius:10px; font-weight:800; border:none; cursor:pointer;
+}
+.btn.ghost{ background:transparent; color:var(--muted); border:1px solid rgba(255,255,255,0.04) }
+.btn.primary{ background: linear-gradient(90deg,var(--accent), #03956d); color:#fff; box-shadow:0 12px 32px rgba(2,8,20,0.28) }
+
+/* submit sheen */
+.btn.primary{ position:relative; overflow:hidden; transition:transform .16s ease, box-shadow .16s;}
+.btn.primary::after{ content:""; position:absolute; left:-40%; top:0; width:40%; height:100%; background:linear-gradient(90deg, rgba(255,255,255,0.06), rgba(255,255,255,0.18), rgba(255,255,255,0.06)); transform:skewX(-18deg) translateX(-100%); transition:transform .85s ease;}
+.btn.primary:hover::after{ transform:skewX(-18deg) translateX(300%); }
+
+/* social icons row (large circular icons) */
+.social-row{ display:flex; gap:12px; justify-content:center; margin-top:14px; }
+.icon-btn{
+  width:56px; height:56px; border-radius:12px; display:inline-flex; align-items:center; justify-content:center; border:none; cursor:pointer;
+  background:linear-gradient(180deg,#fff,#f7f7f7); box-shadow:0 8px 28px rgba(2,8,20,0.28);
+  transition:transform .16s, box-shadow .16s;
+}
+.icon-btn img{ width:26px; height:26px; display:block }
+.icon-btn:hover{ transform:translateY(-6px); box-shadow:0 18px 40px rgba(2,8,20,0.36) }
+
+/* step container */
+.step-content{ display:none; }
+.step-content.active{ display:block; animation:fadeInUp .45s ease both; }
+@keyframes fadeInUp{ from{ opacity:0; transform:translateY(8px) } to{ opacity:1; transform:translateY(0) } }
+
+/* bottom small text */
+.bottom-text{ margin-top:12px; text-align:center; color:var(--muted); font-size:13px }
+
+/* ---------- MOBILE ADJUSTMENTS (targeted; do not affect desktop) ---------- */
+@media (max-width:700px) {
+  /* make body not vertically center everything (so header/hero won't disappear behind tall background) */
+  body { align-items: flex-start; padding:18px 14px; }
+
+  /* stack: show left-panel above card but keep spacing compact */
+  .container { grid-template-columns: 1fr; gap:12px; padding:12px; }
+
+  /* put the brief left-panel content above the card and reduce its size */
+  .left-panel {
+    order: -1;                 /* show before card on small screens */
+    padding: 6px 6px 0 6px;
+  }
+  .left-panel h1 { font-size:20px; margin-top:6px; }
+  .lead { font-size:14px; margin-bottom:8px; color:var(--muted); }
+
+  /* card: full-width, centered and visually elevated */
+  .card {
+    margin: 0 auto;
+    width: calc(100% - 12px);
+    max-width: 560px;
+    padding: 16px;
+    border-radius: 12px;
+  }
+
+  /* tighten avatar preview on mobile */
+  .avatar-preview { width:64px; height:64px; border-radius:12px; }
+
+  /* keep the "Next"/"Create" controls large & centered */
+  .controls { flex-direction:column-reverse; gap:12px; align-items:stretch; }
+  .controls .btn.primary { width:100%; display:block; }
+
+  /* social icons smaller on small screens */
+  .icon-btn{ width:48px; height:48px; }
+  .icon-btn img{ width:20px; height:20px; }
+
+  /* reduce bottom text size and spacing */
+  .bottom-text { font-size:13px; margin-top:10px; }
+
+  /* ensure inputs are vertically centered within their rounded boxes */
+  input[type="text"], input[type="email"], input[type="password"], select, textarea {
+    padding:12px 12px;
+    font-size:15px;
+  }
+
+  /* ensure the card doesn't get hidden under mobile browser UI */
+  .card { will-change: transform; -webkit-transform: translateZ(0); transform: translateZ(0); }
+}
+
+/* also keep the large desktop to tablet breakpoint styling already present */
+@media (max-width:980px){
+  .container{ grid-template-columns: 1fr; gap:18px; }
+  .avatar-preview{ width:64px; height:64px; }
+}
+</style>
+</head>
+<body>
+  <div class="bg-layer"><img src="/static/images/bacgroung_img.png" alt="bg"></div>
+  <div class="grain" aria-hidden="true"></div>
+
+  <div class="container" role="main" aria-labelledby="create-account-title">
+    <!-- left explanation -->
+    <div class="left-panel" aria-hidden="false">
+      <div class="brand">
+    <img src="/static/images/logo.png"
+         alt="Task Manager Logo"
+         style="width:48px; height:48px; border-radius:12px; object-fit:cover;">
+    
+    <div>
+        <div style="font-weight:800">Task Manager</div>
+        <div style="font-size:12px;color:var(--muted)"></div>
+    </div>
+</div>
+
+      <h1 id="create-account-title">Create your account</h1>
+      <p class="lead">Join and organize your tasks, set reminders and track progress — designed for students and small teams.</p>
+
+      <h3 style="margin-top:18px">Why sign up?</h3>
+      <ul style="color:var(--muted); line-height:1.6; margin-top:6px">
+        <li>Save tasks to your account (server-side)</li>
+        <li>Get reminders by email</li>
+        <li>Personal dashboard & filters</li>
+      </ul>
+
+      <div style="margin-top:18px">
+        <div style="display:flex; gap:10px; align-items:center;">
+          <div style="width:10px;height:10px;background:#06b981;border-radius:50%"></div>
+          <div style="color:var(--muted)">Secure password hashing</div>
+        </div>
+        <div style="display:flex; gap:10px; align-items:center; margin-top:8px;">
+          <div style="width:10px;height:10px;background:#60a5fa;border-radius:50%"></div>
+          <div style="color:var(--muted)">Cloud-ready (deploy later)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- right wizard card -->
+    <div class="card" role="region" aria-label="Create account card">
+      <div class="steps" aria-hidden="true">
+        <div class="step active" id="stepIndicator-1">1 • Account</div>
+        <div class="step" id="stepIndicator-2">2 • Profile</div>
+        <div class="step" id="stepIndicator-3">3 • Preferences</div>
+      </div>
+
+      <form id="signupForm"
+      action="/signup"
+      method="POST"
+      autocomplete="on"
+      novalidate
+      enctype="multipart/form-data">
+
+        <!-- STEP 1: ACCOUNT -->
+        <div class="step-content active" data-step="1">
+          <div class="field">
+            <label for="fullname">Full name</label>
+            <input id="fullname" name="fullname" type="text" required>
+            <div class="error" id="err-fullname">Please enter your full name.</div>
+          </div>
+
+          <div class="field">
+            <label for="username">Username</label>
+            <input id="username" name="username" type="text" required>
+            <div class="error" id="err-username">Please choose a username (min 3 characters).</div>
+          </div>
+
+          <div class="field">
+            <label for="email">Email</label>
+            <input id="email" name="email" type="email" required>
+            <div class="error" id="err-email">Please enter a valid email address.</div>
+          </div>
+
+          <div class="field">
+            <label for="password">Password</label>
+            <div style="position:relative">
+              <input id="password" name="password" type="password" required placeholder="At least 8 characters">
+              <button type="button" id="pwToggle" aria-label="Show password" title="Show password" style="position:absolute; right:10px; top:50%; transform:translateY(-50%); background:transparent; border:none; cursor:pointer; font-size:16px;">👁️</button>
+            </div>
+            <div class="helper">Use 8+ characters. Password will be hashed server-side.</div>
+            <div class="error" id="err-password">Password must be at least 8 characters.</div>
+          </div>
+
+          <div style="display:flex; gap:10px; margin-top:6px;">
+            <button type="button" class="btn ghost" id="toStep2">Next →</button>
+            <div style="flex:1"></div>
+            <div class="bottom-text">Or sign up with</div>
+          </div>
+
+          <!-- small social row (inline fallback) -->
+          <div class="social-row" aria-hidden="false">
+            <button type="button" class="icon-btn" title="Continue with Google" onclick="socialSign('google')">
+              <img src="/static/icons/google.svg" alt="Google">
+            </button>
+            <button type="button" class="icon-btn" title="Continue with GitHub" onclick="socialSign('github')">
+              <img src="/static/icons/github.svg" alt="GitHub">
+            </button>
+            <button type="button" class="icon-btn" title="Continue with Apple" onclick="socialSign('apple')">
+              <img src="/static/icons/apple.svg" alt="Apple">
+            </button>
+          </div>
+        </div>
+
+        <!-- STEP 2: PROFILE -->
+        <div class="step-content" data-step="2">
+          <div class="avatar-row">
+            <div class="avatar-preview" id="avatarPreview" aria-hidden="true">
+              <img id="avatarImg" src="" alt="" style="display:none">
+              <span id="avatarPlaceholder" style="color:#374151; font-weight:800;">A</span>
+            </div>
+
+            <div style="flex:1">
+              <label for="avatar">Upload avatar (optional)</label>
+              <input id="avatar" name="avatar" type="file" accept="image/*">
+              <div class="helper">Square image recommended. Will be uploaded to server on submit.</div>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="bio">Short bio (optional)</label>
+            <textarea id="bio" name="bio" placeholder="Say something about yourself"></textarea>
+          </div>
+
+          <div style="display:flex; gap:10px; justify-content:space-between; align-items:center;">
+            <button type="button" class="btn ghost" id="backTo1">← Back</button>
+            <button type="button" class="btn primary" id="toStep3">Next →</button>
+          </div>
+        </div>
+
+        <!-- STEP 3: PREFERENCES -->
+        <div class="step-content" data-step="3">
+          <div class="field">
+            <label for="role">Role</label>
+            <select id="role" name="role">
+              <option value="student">Student</option>
+              <option value="team_lead">Team Lead</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="notify_email">Reminder by email?</label>
+            <select id="notify_email" name="notify_email">
+              <option value="1">Yes — send reminder emails</option>
+              <option value="0">No</option>
+            </select>
+          </div>
+
+          <div class="field" style="margin-top:4px;">
+            <label style="display:flex; gap:8px; align-items:center;">
+              <input id="terms" name="terms" type="checkbox" required> I agree to the <a href="/terms" style="color:#3ebd9c; font-weight:700">Terms & Conditions</a>
+            </label>
+            <div class="error" id="err-terms">You must agree to the Terms & Conditions.</div>
+          </div>
+
+          <!-- hidden fields used to pass avatar preview filename or base64 (optional) -->
+          <input type="hidden" name="avatar_filename" id="avatar_filename" value="">
+
+          <div class="controls">
+            <button type="button" class="btn ghost" id="backTo2">← Back</button>
+            <div style="display:flex; gap:10px;">
+              <button type="submit" class="btn primary" id="finalSubmit">Create Account</button>
+            </div>
+          </div>
+
+          <div class="bottom-text" style="margin-top:12px">Already have an account? <a href="/" style="color:#3ebd9c; font-weight:700">Sign in</a></div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+<script>
+/* Utility */
+function $(sel){ return document.querySelector(sel); }
+function $all(sel){ return Array.from(document.querySelectorAll(sel)); }
+
+/* Wizard state */
+let step = 1;
+const totalSteps = 3;
+
+/* show step */
+function showStep(n){
+  step = n;
+  $all('.step').forEach((el, idx) => {
+    if(idx+1 === n) el.classList.add('active'); else el.classList.remove('active');
+  });
+  $all('.step-content').forEach((el) => {
+    if(parseInt(el.getAttribute('data-step')) === n) el.classList.add('active'); else el.classList.remove('active');
+  });
+  // accessibility: focus first input in step
+  const firstInput = document.querySelector(`.step-content[data-step="${n}"] input, .step-content[data-step="${n}"] textarea, .step-content[data-step="${n}"] select`);
+  if(firstInput) firstInput.focus();
+}
+
+/* initial */
+showStep(1);
+
+/* navigation buttons */
+$('#toStep2').addEventListener('click', () => {
+  // validate step1 fields quickly
+  let ok = true;
+  const fullname = $('#fullname'); const username = $('#username'); const email = $('#email'); const pwd = $('#password');
+  // reset errors
+  $all('.error').forEach(e => e.classList.remove('show'));
+
+  if(!fullname.value.trim()){ $('#err-fullname').classList.add('show'); ok=false; }
+  if(username.value.trim().length < 3){ $('#err-username').classList.add('show'); ok=false; }
+  if(!/^\S+@\S+\.\S+$/.test(email.value.trim())){ $('#err-email').classList.add('show'); ok=false; }
+  if(pwd.value.length < 8){ $('#err-password').classList.add('show'); ok=false; }
+
+  if(ok) showStep(2);
+});
+
+$('#backTo1').addEventListener('click', () => showStep(1));
+$('#toStep3').addEventListener('click', () => showStep(3));
+$('#backTo2').addEventListener('click', () => showStep(2));
+
+/* password toggle */
+(function(){
+  const pw = document.getElementById('password');
+  const btn = document.getElementById('pwToggle');
+  btn.addEventListener('click', () => {
+    const show = pw.type === 'password';
+    pw.type = show ? 'text' : 'password';
+    btn.title = show ? 'Hide password' : 'Show password';
+    btn.setAttribute('aria-pressed', show?'true':'false');
+    pw.focus();
+  });
+})();
+
+/* avatar preview */
+const avatarInput = $('#avatar');
+const avatarImg = $('#avatarImg');
+const avatarPlaceholder = $('#avatarPlaceholder');
+const avatarPreview = $('#avatarPreview');
+const avatarFilename = $('#avatar_filename');
+
+avatarInput.addEventListener('change', () => {
+  const file = avatarInput.files && avatarInput.files[0];
+  if(!file) return;
+  // show preview
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    avatarImg.src = e.target.result;
+    avatarImg.style.display = 'block';
+    avatarPlaceholder.style.display = 'none';
+    avatarFilename.value = file.name;
+  };
+  reader.readAsDataURL(file);
+});
+
+/* social sign placeholders */
+function socialSign(provider){
+  alert('Continue with ' + provider + ' (OAuth not configured).');
+}
+
+/* form submission validation */
+const form = document.getElementById('signupForm');
+form.addEventListener('submit', (e) => {
+  // ensure terms checked
+  if(!$('#terms').checked){
+    e.preventDefault();
+    $('#err-terms').classList.add('show');
+    showStep(3);
+    return false;
+  }
+});
+
+/* small accessibility: next step when pressing Enter on some fields */
+$('#password').addEventListener('keydown', (ev) => {
+  if(ev.key === 'Enter'){ ev.preventDefault(); $('#toStep2').click(); }
+});
+
+/* keep step indicator toggled */
+function syncStepIndicators(){
+  $all('.step').forEach((el, idx) => {
+    if(idx+1 === step) el.classList.add('active'); else el.classList.remove('active');
+  });
+}
+setInterval(syncStepIndicators, 250);
+</script>
+</body>
+</html>

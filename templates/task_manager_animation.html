@@ -1,0 +1,258 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Task Manager — Logo Animation + Recorder</title>
+  <style>
+    html,body{height:100%;margin:0;background:linear-gradient(180deg,#7b4bf0 0%, #34b0ff 100%);}
+    .wrap{display:flex;flex-direction:column;align-items:center;gap:12px;padding-top:18px;}
+    canvas{background:transparent;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,0.15);}
+    button{padding:10px 18px;font-size:16px;border-radius:8px;border:none;background:#2b2bff;color:white;cursor:pointer}
+    p{color:white;margin:0;font-family:system-ui,Arial}
+    .note{font-size:13px;opacity:.95}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <p style="font-weight:700">Task Manager — Logo animation</p>
+    <canvas id="c" width="720" height="720"></canvas>
+    <div>
+      <button id="startBtn">Start render & download</button>
+      <button id="previewBtn">Preview (no download)</button>
+    </div>
+    <p class="note">Put your logo image next to this HTML named <code>logo.png</code>, or edit the image filename inside the code.</p>
+  </div>
+
+<script>
+(async function(){
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d', { alpha: true });
+
+  // --- USER: change filename here if your image is named differently
+  const logoSrc = 'logo.png';
+
+  // load logo image
+  const img = await new Promise((res, rej) => {
+    const i = new Image();
+    i.onload = () => res(i);
+    i.onerror = rej;
+    i.src = logoSrc;
+    i.crossOrigin = "anonymous";
+  }).catch(e => { alert('Failed to load logo.png. Make sure the file is in same folder and named logo.png'); throw e; });
+
+  // scale logo to fit canvas while preserving aspect ratio
+  const canvasW = canvas.width, canvasH = canvas.height;
+  const scale = Math.min(canvasW / img.width, canvasH / img.height) * 0.86;
+  const logoW = Math.round(img.width * scale);
+  const logoH = Math.round(img.height * scale);
+  const logoX = Math.round((canvasW - logoW)/2);
+  const logoY = Math.round((canvasH - logoH)/2 - 10);
+
+  // Eye positions: ratio-driven guesses (works with your logo)
+  // If your logo layout differs, adjust these relative coords (0..1)
+  const leftEye = { x: 0.38, y: 0.33, rx: 0.045, ry: 0.045 };
+  const rightEye = { x: 0.62, y: 0.33, rx: 0.045, ry: 0.045 };
+
+  function eyeToPixel(eye){
+    return {
+      x: logoX + eye.x * logoW,
+      y: logoY + eye.y * logoH,
+      rx: eye.rx * logoW,
+      ry: eye.ry * logoH
+    };
+  }
+
+  const L = eyeToPixel(leftEye);
+  const R = eyeToPixel(rightEye);
+
+  // check mark position to animate (approx right side of body)
+  const checkPos = { x: logoX + 0.78*logoW, y: logoY + 0.58*logoH };
+
+  // animation params
+  const fps = 30;
+  const duration = 2.2; // seconds
+  const totalFrames = Math.round(duration * fps);
+
+  // blink schedule (seconds into animation)
+  const blinkTimes = [0.4, 1.1, 1.7];
+
+  // draw one frame at progress t [0..1]
+  function drawFrame(t){
+    // clear canvas (we keep background outside canvas; but here fill with transparent)
+    ctx.clearRect(0,0,canvasW,canvasH);
+
+    // subtle outer gradient overlay to match your background (keeps colors consistent)
+    const g = ctx.createLinearGradient(0,0,0,canvasH);
+    g.addColorStop(0, '#7b4bf0');
+    g.addColorStop(1, '#34b0ff');
+    ctx.fillStyle = g;
+    ctx.fillRect(0,0,canvasW,canvasH);
+
+    // bounce effect
+    const bounce = 1.0 + 0.03 * Math.sin(2*Math.PI*(t*2));
+    const yOffset = Math.round(6 * Math.sin(2*Math.PI*(t*2)));
+
+    // draw the logo scaled slightly
+    ctx.save();
+    const cx = canvasW/2, cy = canvasH/2 + yOffset - 10;
+    ctx.translate(cx, cy);
+    ctx.scale(bounce, bounce);
+    ctx.drawImage(img, -logoW/2, -logoH/2, logoW, logoH);
+    ctx.restore();
+
+    // compute current time in seconds
+    const time = t * duration;
+
+    // blinking: find if any blink is happening
+    let eyelidProgress = 0;
+    const blinkDur = 0.12;
+    for(let bt of blinkTimes){
+      if(time >= bt && time <= bt + blinkDur){
+        eyelidProgress = (time - bt) / blinkDur; break;
+      }
+    }
+
+    // draw eyelid as filled ellipse covering eye from top downward (using purple shade that matches style)
+    if(eyelidProgress > 0){
+      const cover = Math.sin(Math.PI * eyelidProgress); // smooth in/out
+      ctx.fillStyle = '#2b2b63'; // navy/purple-ish - blends nicely
+      [L, R].forEach(e => {
+        const rx = e.rx * 1.2, ry = e.ry * 1.6;
+        const top = e.y - ry/2;
+        const bottom = e.y - ry/2 + (ry * cover);
+        // draw ellipse-like covering via scaled circle
+        ctx.beginPath();
+        ctx.ellipse(e.x, (top + bottom)/2, rx, (bottom-top)/2, 0, 0, 2*Math.PI);
+        ctx.fill();
+      });
+    }
+
+    // draw checkmark progressive between checkStart..checkEnd
+    const checkStart = 0.95, checkEnd = 1.6;
+    if(time >= checkStart){
+      const prog = Math.min(1, (time - checkStart) / (checkEnd - checkStart));
+      // draw progressive green check
+      drawProgressiveCheck(ctx, checkPos.x, checkPos.y, prog, 8);
+    }
+
+    // small soft shadow under the logo
+    ctx.save();
+    ctx.globalAlpha = 0.14;
+    ctx.fillStyle = 'rgba(0,0,0,0.65)';
+    ctx.beginPath();
+    ctx.ellipse(canvasW/2, canvasH*0.83, logoW*0.25, logoH*0.065, 0, 0, 2*Math.PI);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // helper: progressive check stroke
+  function drawProgressiveCheck(ctx, x, y, progress, thickness){
+    // check coordinates relative to x,y
+    const ax = x - 30, ay = y - 10;
+    const bx = x - 10, by = y + 15;
+    const cx = x + 30, cy = y - 20;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = '#28c23c';
+    ctx.lineWidth = thickness;
+    ctx.beginPath();
+    if(progress <= 0.5){
+      const t = progress / 0.5;
+      const ex = ax + (bx-ax)*t;
+      const ey = ay + (by-ay)*t;
+      ctx.moveTo(ax, ay); ctx.lineTo(ex, ey);
+    }else{
+      // first segment full
+      ctx.moveTo(ax, ay); ctx.lineTo(bx, by);
+      const t = (progress - 0.5) / 0.5;
+      const ex = bx + (cx-bx)*t;
+      const ey = by + (cy-by)*t;
+      ctx.moveTo(bx, by); ctx.lineTo(ex, ey);
+    }
+    ctx.stroke();
+
+    // small outer glow while drawing
+    if(progress > 0 && progress < 1){
+      ctx.save();
+      ctx.globalAlpha = 0.18;
+      ctx.strokeStyle = '#aef5b6';
+      ctx.lineWidth = thickness + 6;
+      ctx.beginPath();
+      if(progress <= 0.5){
+        const t = progress / 0.5;
+        const ex = ax + (bx-ax)*t;
+        const ey = ay + (by-ay)*t;
+        ctx.moveTo(ax, ay); ctx.lineTo(ex, ey);
+      } else {
+        ctx.moveTo(ax, ay); ctx.lineTo(bx, by);
+        const t = (progress - 0.5) / 0.5;
+        const ex = bx + (cx-bx)*t;
+        const ey = by + (cy-by)*t;
+        ctx.moveTo(bx, by); ctx.lineTo(ex, ey);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  // animator
+  function playOnce({record=false, autoStop=true} = {}){
+    let start = null;
+    let rafId = null;
+    const framesToRender = totalFrames;
+
+    // if recording, create MediaRecorder from canvas stream
+    let recorder, chunks = [];
+    if(record){
+      const stream = canvas.captureStream(fps);
+      recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' });
+      recorder.ondataavailable = e => { if(e.data && e.data.size) chunks.push(e.data); };
+      recorder.onstop = () => {
+        const blob = new Blob(chunks, { type: 'video/webm' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'task_manager_animation.webm';
+        a.click();
+        URL.revokeObjectURL(url);
+      };
+      recorder.start();
+    }
+
+    function step(timestamp){
+      if(!start) start = timestamp;
+      const elapsed = (timestamp - start) / 1000; // in sec
+      const t = Math.min(1, elapsed / duration);
+      drawFrame(t);
+      if(t < 1){
+        rafId = requestAnimationFrame(step);
+      }else{
+        // final frame drawn
+        if(recorder){
+          // give MediaRecorder a moment to capture final frames
+          setTimeout(() => recorder.stop(), 250);
+        }
+        if(autoStop){
+          cancelAnimationFrame(rafId);
+        }
+      }
+    }
+    rafId = requestAnimationFrame(step);
+  }
+
+  // button bindings
+  document.getElementById('startBtn').onclick = () => {
+    // run a preview quickly then record for reliability
+    playOnce({record:true, autoStop:true});
+  };
+  document.getElementById('previewBtn').onclick = () => {
+    playOnce({record:false, autoStop:true});
+  };
+
+  // initial preview draw
+  drawFrame(0);
+
+})();
+</script>
+</body>
+</html>

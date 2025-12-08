@@ -1,0 +1,143 @@
+<!-- templates/splash.html (replace existing) -->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Welcome — Task Manager</title>
+  <style>
+    html,body{height:100%;margin:0;background:linear-gradient(180deg,#7b4bf0,#34b0ff);display:flex;align-items:center;justify-content:center;}
+    .video-wrap{width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:0;margin:0;}
+    video{
+      width:360px;
+      height:auto;
+      max-width:92vw;
+      max-height:92vh;
+      border-radius:18px;
+      box-shadow:0 24px 64px rgba(0,0,0,0.35);
+      background: transparent;
+      display:block;
+    }
+    @media (min-width:900px){ video{ width:520px; } }
+  </style>
+</head>
+<body>
+  <div class="video-wrap">
+    <video id="splashVideo"
+           playsinline
+           muted
+           preload="auto"
+           poster="{{ url_for('static', filename='images/logo.png') }}"
+           webkit-playsinline
+           x-webkit-airplay="allow">
+      <source src="{{ url_for('static', filename='animations/splash.mp4') }}" type="video/mp4">
+      Sorry — your browser doesn't support the video element.
+    </video>
+  </div>
+
+  <script>
+    (function () {
+      const loginUrl = "{{ url_for('login') }}";
+      const video = document.getElementById('splashVideo');
+      let fallbackTimer = null;
+      let navigated = false;
+
+      function navigate() {
+        if (navigated) return;
+        navigated = true;
+        // use replace so splash doesn't remain in history
+        window.location.replace(loginUrl);
+      }
+
+      // robust handlers
+      video.addEventListener('ended', () => {
+        console.log('splash: video ended -> navigate');
+        navigate();
+      });
+
+      video.addEventListener('error', (ev) => {
+        console.warn('splash: video error', ev);
+        // fallback navigation
+        navigate();
+      });
+
+      // Some browsers may not fire ended if autoplay was prevented.
+      // Use canplaythrough/playing as signs the video started and set fallback.
+      video.addEventListener('playing', () => {
+        console.log('splash: video playing');
+        // give a safety fallback in case 'ended' doesn't fire (e.g. short clip)
+        clearTimeout(fallbackTimer);
+        fallbackTimer = setTimeout(() => {
+          console.log('splash: fallback after playing timeout');
+          navigate();
+        }, Math.max(3000, (video.duration || 3) * 1000 + 400)); // a bit after expected duration
+      });
+
+      video.addEventListener('canplaythrough', () => {
+        console.log('splash: canplaythrough');
+      });
+
+      // ultimate fallback in case autoplay blocked entirely or events fail.
+      const ultimateFallback = setTimeout(() => {
+        console.warn('splash: ultimate fallback triggered — redirecting to login');
+        navigate();
+      }, 6000); // 6s overall fallback
+
+      // Try programmatic playback (muted should allow autoplay on most browsers)
+      function tryPlay() {
+        // ensure muted (some browsers allow muted autoplay only)
+        video.muted = true;
+        const playPromise = video.play();
+        if (playPromise !== undefined) {
+          playPromise.then(() => {
+            console.log('splash: programmatic play succeeded');
+            clearTimeout(ultimateFallback);
+            // let playing handler set another fallback based on duration
+          }).catch((err) => {
+            console.warn('splash: programmatic play rejected', err);
+            // If autoplay blocked, show poster then redirect after short delay
+            // We'll let ultimateFallback handle redirect; also allow user to tap to skip
+            video.addEventListener('click', () => {
+              console.log('splash: user clicked video - navigating to login');
+              navigate();
+            });
+          });
+        } else {
+          // older browsers — rely on events + fallback
+          console.log('splash: no play promise (old browser)');
+        }
+      }
+
+      // If page becomes hidden, avoid trying to redirect while hidden.
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+          console.log('splash: page hidden');
+        } else {
+          console.log('splash: page visible');
+        }
+      });
+
+      // Start
+      tryPlay();
+
+      // safety: listen for orientationchange/resize — sometimes mobile will not show controls until rotate.
+      window.addEventListener('orientationchange', () => {
+        console.log('splash: orientationchange');
+        // attempt to play again (some browsers allow play after orientation change)
+        tryPlay();
+      });
+
+      // If the video has zero duration (corrupt) just navigate.
+      video.addEventListener('loadedmetadata', () => {
+        if (!video.duration || isNaN(video.duration)) {
+          console.warn('splash: video has invalid duration; fallback to login');
+          navigate();
+        } else {
+          console.log('splash: duration =', video.duration);
+        }
+      });
+
+    })();
+  </script>
+</body>
+</html>

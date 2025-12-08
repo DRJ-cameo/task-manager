@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>About — Task Management Tool</title>
+
+  <style>
+    :root{
+      --bg1:#6a11cb;
+      --bg2:#2575fc;
+      --card-shadow: 0 16px 40px rgba(6,12,40,0.24);
+      --muted: rgba(255,255,255,0.92);
+      --radius:14px;
+      --accent: #00b894;
+    }
+    *{ box-sizing: border-box; }
+    body{
+      margin:0;
+      font-family: Inter, "Poppins", system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+      color:#fff;
+      background: linear-gradient(135deg,var(--bg1),var(--bg2));
+      min-height:100vh;
+      background-size:400% 400%;
+      animation: floatingBg 18s infinite alternate linear;
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+    }
+    @keyframes floatingBg { from{background-position:0 0} to{background-position:100% 100%} }
+
+    /* NAV */
+    .navbar{
+      display:flex; align-items:center; justify-content:space-between;
+      padding:12px 20px;
+      background: rgba(0,0,0,0.22);
+      backdrop-filter: blur(6px);
+      position:relative; z-index:1000;
+    }
+    .brand{ font-weight:700; font-size:1.05rem; letter-spacing:0.6px; }
+
+    .menu-icon{
+      display:flex; flex-direction:column; gap:5px;
+      cursor:pointer; padding:8px;
+    }
+    .menu-icon div{
+      width:28px; height:3.6px;
+      background:rgba(255,255,255,0.96);
+      border-radius:3px;
+      transition: transform .18s, opacity .18s;
+    }
+
+    .menu{
+      position:absolute; right:20px; top:calc(100% + 12px);
+      width:220px;
+      background: linear-gradient(180deg, rgba(6,10,30,0.98), rgba(10,16,40,0.98));
+      border-radius:12px;
+      padding:8px;
+      box-shadow:var(--card-shadow);
+      transform-origin: top right;
+      transform: translateY(-6px) scale(.98);
+      opacity:0; pointer-events:none;
+      transition: opacity .22s ease, transform .22s cubic-bezier(.2,.9,.2,1);
+      z-index:1200;
+    }
+    .menu.open{
+      transform: translateY(0) scale(1);
+      opacity:1; pointer-events:auto;
+    }
+    .menu a{
+      color:var(--muted);
+      text-decoration:none;
+      padding:10px 12px;
+      font-weight:600;
+      display:block;
+      border-radius:8px;
+      margin:4px;
+    }
+    .menu a:hover{
+      background: rgba(255,255,255,0.03);
+      transform: translateX(4px);
+    }
+    .menu-icon.open > div:nth-child(1){ transform: translateY(6px) rotate(45deg); }
+    .menu-icon.open > div:nth-child(2){ opacity:0; transform:scaleX(0); }
+    .menu-icon.open > div:nth-child(3){ transform: translateY(-6px) rotate(-45deg); }
+
+    /* HEADER */
+    header{
+      text-align:center;
+      padding:60px 20px 20px;
+    }
+    header h1{
+      margin:0;
+      font-size:2.2rem;
+      font-weight:700;
+      text-shadow:0 6px 30px rgba(0,0,0,0.25);
+      opacity:0;
+      transform: translateY(8px);
+      animation: headerIn .7s ease forwards .15s;
+    }
+    header p{
+      margin-top:10px;
+      opacity:0;
+      font-size:1.1rem;
+      transform: translateY(6px);
+      animation: headerIn .7s ease forwards .25s;
+    }
+    @keyframes headerIn {
+      to { opacity:1; transform: translateY(0); }
+    }
+
+    .content{
+      max-width:900px;
+      margin:20px auto 70px;
+      padding:20px;
+    }
+
+    /* CARDS: we will stagger reveal */
+    .card{
+      background: rgba(255,255,255,0.08);
+      padding:25px;
+      border-radius:var(--radius);
+      box-shadow:var(--card-shadow);
+      margin-bottom:30px;
+      backdrop-filter: blur(8px);
+      transform: translateY(18px);
+      opacity:0;
+      will-change: transform, opacity;
+    }
+
+    .card.revealed{
+      animation: cardPop .6s cubic-bezier(.2,.9,.25,1) forwards;
+    }
+    @keyframes cardPop {
+      0% { transform: translateY(18px) scale(.99); opacity:0; }
+      60% { transform: translateY(-6px) scale(1.01); opacity:1; }
+      100% { transform: translateY(0) scale(1); opacity:1; }
+    }
+
+    .card h2{
+      margin-top:0;
+      font-size:1.4rem;
+      font-weight:700;
+      margin-bottom:10px;
+      display:flex;
+      align-items:center;
+      gap:10px;
+    }
+    .card p{
+      opacity:0.95;
+      line-height:1.6;
+      font-size:1rem;
+    }
+
+    /* subtle float accent for icons (CSS only) */
+    .float-accent{
+      display:inline-block;
+      transform-origin:center;
+      animation: floaty 4s ease-in-out infinite;
+    }
+    @keyframes floaty {
+      0% { transform: translateY(0); }
+      50%{ transform: translateY(-6px); }
+      100%{ transform: translateY(0); }
+    }
+
+    /* hover lift for cards */
+    .card:hover{ transform: translateY(-6px); box-shadow: 0 26px 60px rgba(6,12,40,0.34); transition: box-shadow .28s, transform .18s; }
+
+    footer{
+      text-align:center;
+      padding:20px;
+      opacity:0.9;
+      font-size:0.95rem;
+    }
+
+    /* small screens */
+    @media (max-width:640px){
+      header{ padding-top:36px; }
+      .card{ padding:18px; }
+    }
+
+   /* NAVBAR - robust mobile-friendly layout */
+.navbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: rgba(0,0,0,0.18);
+  backdrop-filter: blur(6px);
+  position: relative;
+  z-index: 1200;
+}
+
+/* left group: logo + text */
+.navbar-left {
+  display:flex;
+  align-items:center;
+  gap:12px;
+  min-width: 0; /* allow children to shrink safely */
+}
+
+/* logo image */
+.brand-logo {
+  width:40px;
+  height:40px;
+  border-radius:8px;
+  object-fit:cover;
+  flex: 0 0 auto;
+  box-shadow: 0 6px 14px rgba(0,0,0,0.28);
+}
+
+/* text next to logo – truncate if not enough width */
+.brand-text {
+  font-weight:700;
+  font-size:1.05rem;
+  color:#fff;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  flex: 1 1 auto; /* can shrink if necessary */
+  min-width:0; /* IMPORTANT for preventing overflow/clipping on Android */
+}
+
+/* right group: menu icon */
+.navbar-right {
+  display:flex;
+  align-items:center;
+  gap:12px;
+  flex: 0 0 auto;
+}
+
+/* menu icon */
+.menu-icon {
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  cursor:pointer;
+  padding:8px;
+  background: rgba(255,255,255,0.92);
+  border-radius:10px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+  -webkit-tap-highlight-color: transparent;
+  z-index:1300;
+}
+
+.menu-icon div { width:28px; height:3.6px; background:rgba(10,14,20,0.96); border-radius:3px; }
+
+/* responsive tweaks */
+@media (max-width:420px) {
+  .brand-text { font-size: 0.96rem; }   /* slightly smaller on small phones */
+  .brand-logo { width:36px; height:36px; }
+}
+/* hide text only on extremely narrow screens if necessary */
+@media (max-width:320px) {
+  .brand-text { display:none; }
+}
+
+  </style>
+</head>
+<body>
+
+  <!-- NAVBAR -->
+  <!-- REPLACE the old navbar block with this -->
+<div class="navbar" role="navigation" aria-label="Main navigation">
+  <div class="navbar-left">
+    <img src="/static/images/logo.png" alt="Task Manager logo" class="brand-logo" />
+    <div class="brand-text">Task Manager</div>
+  </div>
+
+  <div class="navbar-right">
+    <div id="menuIcon" class="menu-icon" aria-label="menu" title="menu">
+      <div></div><div></div><div></div>
+    </div>
+    <nav id="menu" class="menu" aria-hidden="true">
+      <a href="/dashboard">Home</a>
+      <a href="/mytask">My Tasks</a>
+      <a href="/profile">Profile</a>
+      <a href="/about">About</a>
+      <a href="/logout" style="color:#ff6b6b;">Logout</a>
+    </nav>
+  </div>
+</div>
+
+
+  <!-- HEADER -->
+  <header>
+    <h1>About Task Manager <span class="float-accent" aria-hidden="true">✨</span></h1>
+    <p> Your all-in-one productivity companion — now with smoother motion and subtle micro-interactions. </p>
+  </header>
+
+  <!-- CONTENT -->
+  <section class="content">
+
+    <div class="card" data-delay="0">
+      <h2>📌 What is Task Manager? <span class="float-accent">📋</span></h2>
+      <p>
+        Task Manager is a modern and beautifully designed productivity tool built to help 
+        students, professionals, and teams stay organized. It brings together smart task 
+        tracking, prioritization, progress monitoring, and clean UI — all into one 
+        lightweight web application.
+      </p>
+    </div>
+
+    <div class="card" data-delay="80">
+      <h2>🚀 Key Features <span class="float-accent">⚡</span></h2>
+      <p>✔ Add, edit, and manage tasks effortlessly<br>
+         ✔ Track priorities and due dates<br>
+         ✔ Auto-synced dashboard and task analytics<br>
+         ✔ Works across desktop and mobile<br>
+         ✔ Clean animations and modern UI<br>
+         ✔ User-specific task storage</p>
+    </div>
+
+    <div class="card" data-delay="160">
+      <h2>💡 Purpose <span class="float-accent">💡</span></h2>
+      <p>
+        This project was created to demonstrate full-stack web development using Flask,
+        responsive frontend design, interactive task management logic, and login-based
+        user workflow.
+      </p>
+    </div>
+
+    <div class="card" data-delay="240">
+      <h2>👤 Developer <span class="float-accent">👨‍💻</span></h2>
+      <p>
+        Designed and developed by <strong>Dhiraj Mazumdar</strong> — with a focus on smooth 
+        UI, animations, and great user experience.
+      </p>
+    </div>
+
+  </section>
+
+  <footer>
+    © 2025 Task Manager — All rights reserved.
+  </footer>
+
+  <!-- Hidden uploaded image (kept for environment/tool integration) -->
+  <!-- Local file: /mnt/data/A_digital_screenshot_of_a_profile_page_for_a_task_.png -->
+  <img src="/mnt/data/A_digital_screenshot_of_a_profile_page_for_a_task_.png" alt="" style="display:none" />
+
+<script>
+  // menu open/close (unchanged)
+  const menu = document.getElementById("menu");
+  const menuIcon = document.getElementById("menuIcon");
+  function openMenu(){ menu.classList.add("open"); menuIcon.classList.add("open"); }
+  function closeMenu(){ menu.classList.remove("open"); menuIcon.classList.remove("open"); }
+  menuIcon.addEventListener("click", e=>{
+    e.stopPropagation();
+    menu.classList.contains("open") ? closeMenu() : openMenu();
+  });
+  document.addEventListener("click", (e)=>{
+    if(!menu.contains(e.target) && !menuIcon.contains(e.target)) closeMenu();
+  });
+  document.querySelectorAll("#menu a").forEach(a => a.addEventListener('click', ()=> closeMenu()));
+
+  // Reveal cards with staggered animation when they enter viewport
+  (function setupReveal(){
+    const cards = Array.from(document.querySelectorAll('.card'));
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if(entry.isIntersecting){
+          const el = entry.target;
+          const delay = parseInt(el.getAttribute('data-delay') || 0, 10);
+          setTimeout(()=> el.classList.add('revealed'), delay);
+          observer.unobserve(el);
+        }
+      });
+    }, { threshold: 0.18 });
+
+    cards.forEach(c => observer.observe(c));
+  })();
+</script>
+
+</body>
+</html>
