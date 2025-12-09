@@ -566,9 +566,7 @@ def logout():
     return redirect('/')
 
 if __name__ == '__main__':
-    # Useful for local testing: read PORT env var if present
+    # production: get PORT from env (Railway sets PORT)
     port = int(os.environ.get('PORT', 5000))
-    host = '0.0.0.0'
-    debug = os.environ.get('FLASK_DEBUG', '0') == '1'
-    # Use threaded=True only for local dev; Gunicorn handles concurrency in production
-    app.run(host=host, port=port, debug=debug, threaded=True)
+    # host 0.0.0.0 so container is reachable
+    app.run(host='0.0.0.0', port=port, debug=False)

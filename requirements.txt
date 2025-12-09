@@ -1,7 +1,5 @@
-Flask>=2.0
-Werkzeug>=2.0
-mysql-connector-python
-APScheduler>=3.10
-gunicorn>=20.1.0
-python-dotenv
-requests
+Flask==3.0.2
+mysql-connector-python==8.3.0
+Werkzeug==3.0.1
+APScheduler==3.10.4
+gunicorn==21.2.0
