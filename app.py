@@ -738,6 +738,91 @@ def edit_profile():
 def about():
     return render_template('about.html')
 
+
+
+# ---- START ONE-TIME IMPORT ROUTE (ADD THIS TO app.py) ----
+import os
+import mysql.connector
+from flask import request, abort, current_app
+
+# Use an IMPORT_SECRET env var to protect the import endpoint.
+# Set IMPORT_SECRET in Railway Secrets / Variables.
+IMPORT_SECRET = os.environ.get("IMPORT_SECRET")
+
+def import_sql_file(path, conn):
+    """Execute SQL statements from a dump file using mysql-connector."""
+    with open(path, "r", encoding="utf-8", errors="replace") as f:
+        sql = f.read()
+    cursor = conn.cursor()
+    try:
+        # execute supports multi-statement execution via multi=True
+        for _ in cursor.execute(sql, multi=True):
+            pass
+        conn.commit()
+    finally:
+        cursor.close()
+
+@app.route("/_import_db_once", methods=["POST"])
+def import_db_once():
+    # 1) require secret (header X-IMPORT-SECRET or ?secret=)
+    secret = request.headers.get("X-IMPORT-SECRET") or request.args.get("secret")
+    if IMPORT_SECRET is None:
+        current_app.logger.error("IMPORT_SECRET is not set in environment. Import aborted.")
+        abort(403, "Import not configured")
+    if not secret or secret != IMPORT_SECRET:
+        abort(403, "Forbidden")
+
+    # 2) ensure dump file is present (repo root)
+    dump_path = os.path.join(os.getcwd(), "dump.sql")
+    if not os.path.isfile(dump_path):
+        abort(404, "dump.sql not found in repo root")
+
+    # 3) read DB connection from env vars (Railway sets MYSQL* vars)
+    db_host = os.environ.get("MYSQLHOST") or os.environ.get("MYSQL_HOST") or os.environ.get("DB_HOST")
+    db_port = int(os.environ.get("MYSQLPORT") or os.environ.get("MYSQL_PORT") or os.environ.get("DB_PORT", 3306))
+    db_user = os.environ.get("MYSQLUSER") or os.environ.get("MYSQL_USER") or os.environ.get("DB_USER")
+    db_password = os.environ.get("MYSQLPASSWORD") or os.environ.get("MYSQL_PASSWORD") or os.environ.get("DB_PASSWORD")
+    db_name = os.environ.get("MYSQLDATABASE") or os.environ.get("MYSQL_DATABASE") or os.environ.get("DB_NAME") or os.environ.get("MYSQL_DB")
+
+    if not (db_host and db_user and db_password and db_name):
+        current_app.logger.error("Database env vars missing. Check Railway variables.")
+        abort(500, "DB configuration incomplete")
+
+    # 4) Connect and import
+    try:
+        conn = mysql.connector.connect(
+            host=db_host,
+            port=db_port,
+            user=db_user,
+            password=db_password,
+            database=db_name,
+            connection_timeout=30
+        )
+    except Exception as e:
+        current_app.logger.exception("Failed to connect to DB")
+        abort(500, f"DB connection failed: {e}")
+
+    try:
+        import_sql_file(dump_path, conn)
+    except Exception as e:
+        current_app.logger.exception("Import failed")
+        abort(500, f"Import failed: {e}")
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+    # 5) delete dump file for safety (best-effort)
+    try:
+        os.remove(dump_path)
+    except Exception as e:
+        current_app.logger.warning(f"Could not delete dump.sql automatically: {e}")
+
+    return "Import completed successfully. dump.sql removed.", 200
+# ---- END ONE-TIME IMPORT ROUTE ----
+
+
 # ---------- App bootstrap ----------
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
