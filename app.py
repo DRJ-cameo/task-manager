@@ -16,6 +16,8 @@ from datetime import datetime
 from functools import wraps
 from apscheduler.schedulers.background import BackgroundScheduler
 from mysql.connector import Error as MySQLError
+from flask import current_app
+import traceback
 
 # ---------- Configuration ----------
 app = Flask(__name__, static_folder='static', template_folder='templates')
@@ -762,65 +764,68 @@ def import_sql_file(path, conn):
     finally:
         cursor.close()
 
-@app.route("/_import_db_once", methods=["POST"])
+@app.route('/_import_db_once', methods=['POST'])
 def import_db_once():
-    # 1) require secret (header X-IMPORT-SECRET or ?secret=)
-    secret = request.headers.get("X-IMPORT-SECRET") or request.args.get("secret")
-    if IMPORT_SECRET is None:
-        current_app.logger.error("IMPORT_SECRET is not set in environment. Import aborted.")
-        abort(403, "Import not configured")
-    if not secret or secret != IMPORT_SECRET:
-        abort(403, "Forbidden")
+    # require import secret
+    secret = request.headers.get('X-IMPORT-SECRET') or request.args.get('import_secret')
+    expected = os.getenv('IMPORT_SECRET')  # ensure this is set in Railway Variables
+    if not expected or secret != expected:
+        return jsonify(status='error', code=403, message='Forbidden'), 403
 
-    # 2) ensure dump file is present (repo root)
-    dump_path = os.path.join(os.getcwd(), "dump.sql")
-    if not os.path.isfile(dump_path):
-        abort(404, "dump.sql not found in repo root")
-
-    # 3) read DB connection from env vars (Railway sets MYSQL* vars)
-    db_host = os.environ.get("MYSQLHOST") or os.environ.get("MYSQL_HOST") or os.environ.get("DB_HOST")
-    db_port = int(os.environ.get("MYSQLPORT") or os.environ.get("MYSQL_PORT") or os.environ.get("DB_PORT", 3306))
-    db_user = os.environ.get("MYSQLUSER") or os.environ.get("MYSQL_USER") or os.environ.get("DB_USER")
-    db_password = os.environ.get("MYSQLPASSWORD") or os.environ.get("MYSQL_PASSWORD") or os.environ.get("DB_PASSWORD")
-    db_name = os.environ.get("MYSQLDATABASE") or os.environ.get("MYSQL_DATABASE") or os.environ.get("DB_NAME") or os.environ.get("MYSQL_DB")
-
-    if not (db_host and db_user and db_password and db_name):
-        current_app.logger.error("Database env vars missing. Check Railway variables.")
-        abort(500, "DB configuration incomplete")
-
-    # 4) Connect and import
     try:
+        # Basic DB config reading (adapt to your variable names)
+        host = os.getenv('MYSQLHOST') or os.getenv('MYSQL_HOST') or os.getenv('DB_HOST')
+        port = int(os.getenv('MYSQLPORT') or os.getenv('MYSQL_PORT') or os.getenv('DB_PORT') or 3306)
+        user = os.getenv('MYSQLUSER') or os.getenv('MYSQL_USER') or os.getenv('DB_USER')
+        password = os.getenv('MYSQLPASSWORD') or os.getenv('MYSQL_PASSWORD') or os.getenv('DB_PASSWORD')
+        database = os.getenv('MYSQLDATABASE') or os.getenv('MYSQL_DATABASE') or os.getenv('DB_NAME')
+
+        if not all([host, user, password, database]):
+            current_app.logger.error('DB configuration incomplete: host/user/password/database missing')
+            return jsonify(status='error', code=500, message='DB configuration incomplete'), 500
+
+        # If you expect dump.sql in the project root
+        dump_path = os.path.join(os.getcwd(), 'dump.sql')
+        if not os.path.exists(dump_path):
+            current_app.logger.error(f'dump.sql not found at {dump_path}')
+            return jsonify(status='error', code=404, message='dump.sql not found'), 404
+
+        # Connect and import - use mysql.connector (already in your imports)
         conn = mysql.connector.connect(
-            host=db_host,
-            port=db_port,
-            user=db_user,
-            password=db_password,
-            database=db_name,
-            connection_timeout=30
+            host=host, port=port, user=user, password=password, database=database,
+            connection_timeout=10
         )
-    except Exception as e:
-        current_app.logger.exception("Failed to connect to DB")
-        abort(500, f"DB connection failed: {e}")
+        cursor = conn.cursor()
 
-    try:
-        import_sql_file(dump_path, conn)
-    except Exception as e:
-        current_app.logger.exception("Import failed")
-        abort(500, f"Import failed: {e}")
-    finally:
-        try:
-            conn.close()
-        except Exception:
-            pass
+        # Read file and execute (for large dumps you'd prefer streaming or mysql CLI on server)
+        with open(dump_path, 'r', encoding='utf-8', errors='ignore') as f:
+            sql = f.read()
 
-    # 5) delete dump file for safety (best-effort)
-    try:
-        os.remove(dump_path)
-    except Exception as e:
-        current_app.logger.warning(f"Could not delete dump.sql automatically: {e}")
+        # Split by statements and execute safely (simple approach)
+        for stmt in sql.split(';'):
+            stmt = stmt.strip()
+            if not stmt:
+                continue
+            try:
+                cursor.execute(stmt + ';')
+            except Exception as e_stmt:
+                current_app.logger.exception("Statement execution failed: %s", e_stmt)
+                # continue or choose to abort; here we continue to try remaining statements
+                # you can return error here instead if you want strict import:
+                # return jsonify(status='error', code=500, message='Statement execution failed'), 500
 
-    return "Import completed successfully. dump.sql removed.", 200
-# ---- END ONE-TIME IMPORT ROUTE ----
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return jsonify(status='ok', message='Import completed'), 200
+
+    except Exception as e:
+        # Log full traceback for Railway logs
+        tb = traceback.format_exc()
+        current_app.logger.error('Import endpoint exception:\n%s', tb)
+        # Return JSON rather than relying on template rendering
+        return jsonify(status='error', code=500, message='Import failed; see server logs'), 500
 
 
 # ---------- App bootstrap ----------
