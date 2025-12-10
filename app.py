@@ -1,8 +1,8 @@
 # app.py
-# Patched version — tightened DB handling, lazy connection, safer cursors, scheduler guarding.
-# Based on the user's original file (uploaded). See: file upload reference. :contentReference[oaicite:1]{index=1}
+# Patched version — robust port parsing and safer import endpoint.
+# Based on the user's uploaded file. See upload reference. :contentReference[oaicite:1]{index=1}
 
-from flask import Flask, render_template, request, redirect, session, jsonify, url_for, flash
+from flask import Flask, render_template, request, redirect, session, jsonify, url_for, flash, current_app, abort
 import mysql.connector
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
@@ -16,7 +16,6 @@ from datetime import datetime
 from functools import wraps
 from apscheduler.schedulers.background import BackgroundScheduler
 from mysql.connector import Error as MySQLError
-from flask import current_app
 import traceback
 
 # ---------- Configuration ----------
@@ -48,10 +47,9 @@ _db_connection = None
 def connect_db():
     """
     Lazy connect to MySQL. Returns connection on success or None on failure.
-    This will not raise on connection failure — it logs and returns None.
     """
     global _db_connection
-    if _db_connection and _db_connection.is_connected():
+    if _db_connection and getattr(_db_connection, 'is_connected', lambda: True)():
         return _db_connection
 
     # Ensure we have credentials
@@ -91,7 +89,6 @@ def get_cursor():
     if not conn:
         raise RuntimeError("Database not available")
     try:
-        # Always return a new cursor to avoid reuse issues
         return conn.cursor(dictionary=True)
     except Exception as e:
         logger.warning("Could not get DB cursor: %s", e)
@@ -120,7 +117,6 @@ scheduler_started = False
 def start_scheduler_if_needed():
     """
     Start the scheduler only if not started and DB is available.
-    The scheduled job uses a fresh cursor each run.
     """
     global scheduler_started
     if scheduler_started:
@@ -131,7 +127,6 @@ def start_scheduler_if_needed():
         return
 
     try:
-        # reference function below
         scheduler.add_job(find_and_send_reminders, 'interval', seconds=60, id='reminder_job', max_instances=1)
         scheduler.start()
         scheduler_started = True
@@ -182,7 +177,6 @@ def signup():
             avatar_file.save(save_path)
             avatar_filename = safe_name
 
-        # Use get_cursor() safely
         try:
             cursor = get_cursor()
         except RuntimeError:
@@ -207,8 +201,6 @@ def signup():
                 cursor.close()
             except Exception:
                 pass
-
-    return render_template('signup.html')
 
 # ---------- Login ----------
 @app.route('/login', methods=['GET', 'POST'])
@@ -740,68 +732,69 @@ def edit_profile():
 def about():
     return render_template('about.html')
 
+# ---- START ONE-TIME IMPORT ROUTE ----
 
-
-# ---- START ONE-TIME IMPORT ROUTE (ADD THIS TO app.py) ----
-import os
-import mysql.connector
-from flask import request, abort, current_app
-
-# Use an IMPORT_SECRET env var to protect the import endpoint.
-# Set IMPORT_SECRET in Railway Secrets / Variables.
 IMPORT_SECRET = os.environ.get("IMPORT_SECRET")
 
-def import_sql_file(path, conn):
-    """Execute SQL statements from a dump file using mysql-connector."""
-    with open(path, "r", encoding="utf-8", errors="replace") as f:
-        sql = f.read()
-    cursor = conn.cursor()
-    try:
-        # execute supports multi-statement execution via multi=True
-        for _ in cursor.execute(sql, multi=True):
-            pass
-        conn.commit()
-    finally:
-        cursor.close()
+def parse_int_env(names, default):
+    """
+    Try to parse an integer from environment variables listed in `names`.
+    Return the first valid int found, otherwise return `default`.
+    This avoids ValueError when env contains placeholders like '${ MySQL.MYSQLPORT }'.
+    """
+    for n in names:
+        v = os.getenv(n)
+        if v is None:
+            continue
+        v = v.strip()
+        if not v:
+            continue
+        # skip Railway template placeholders like ${ MySQL.MYSQLPORT }
+        if v.startswith('${') and '}' in v:
+            continue
+        try:
+            return int(v)
+        except Exception:
+            continue
+    return default
 
 @app.route('/_import_db_once', methods=['POST'])
 def import_db_once():
     # require import secret
     secret = request.headers.get('X-IMPORT-SECRET') or request.args.get('import_secret')
-    expected = os.getenv('IMPORT_SECRET')  # ensure this is set in Railway Variables
+    expected = os.getenv('IMPORT_SECRET')
     if not expected or secret != expected:
         return jsonify(status='error', code=403, message='Forbidden'), 403
 
     try:
-        # Basic DB config reading (adapt to your variable names)
+        # robust host/user/password/database/port parsing
         host = os.getenv('MYSQLHOST') or os.getenv('MYSQL_HOST') or os.getenv('DB_HOST')
-        port = int(os.getenv('MYSQLPORT') or os.getenv('MYSQL_PORT') or os.getenv('DB_PORT') or 3306)
         user = os.getenv('MYSQLUSER') or os.getenv('MYSQL_USER') or os.getenv('DB_USER')
         password = os.getenv('MYSQLPASSWORD') or os.getenv('MYSQL_PASSWORD') or os.getenv('DB_PASSWORD')
         database = os.getenv('MYSQLDATABASE') or os.getenv('MYSQL_DATABASE') or os.getenv('DB_NAME')
+        port = parse_int_env(['MYSQLPORT','MYSQL_PORT','DB_PORT','MYSQL_PORT_3306'], 3306)
 
         if not all([host, user, password, database]):
             current_app.logger.error('DB configuration incomplete: host/user/password/database missing')
             return jsonify(status='error', code=500, message='DB configuration incomplete'), 500
 
-        # If you expect dump.sql in the project root
         dump_path = os.path.join(os.getcwd(), 'dump.sql')
         if not os.path.exists(dump_path):
             current_app.logger.error(f'dump.sql not found at {dump_path}')
             return jsonify(status='error', code=404, message='dump.sql not found'), 404
 
-        # Connect and import - use mysql.connector (already in your imports)
+        # Connect and import using mysql-connector
         conn = mysql.connector.connect(
             host=host, port=port, user=user, password=password, database=database,
-            connection_timeout=10
+            connection_timeout=30
         )
         cursor = conn.cursor()
 
-        # Read file and execute (for large dumps you'd prefer streaming or mysql CLI on server)
+        # Read file and execute statements. Multi-statement SQL will be split by semicolon.
         with open(dump_path, 'r', encoding='utf-8', errors='ignore') as f:
             sql = f.read()
 
-        # Split by statements and execute safely (simple approach)
+        # Execute statements safely (simple approach). This tolerates non-critical failures.
         for stmt in sql.split(';'):
             stmt = stmt.strip()
             if not stmt:
@@ -809,10 +802,8 @@ def import_db_once():
             try:
                 cursor.execute(stmt + ';')
             except Exception as e_stmt:
-                current_app.logger.exception("Statement execution failed: %s", e_stmt)
-                # continue or choose to abort; here we continue to try remaining statements
-                # you can return error here instead if you want strict import:
-                # return jsonify(status='error', code=500, message='Statement execution failed'), 500
+                current_app.logger.exception("Statement execution failed (continuing): %s", e_stmt)
+                # continue with remaining statements
 
         conn.commit()
         cursor.close()
@@ -821,23 +812,16 @@ def import_db_once():
         return jsonify(status='ok', message='Import completed'), 200
 
     except Exception as e:
-        # Log full traceback for Railway logs
         tb = traceback.format_exc()
         current_app.logger.error('Import endpoint exception:\n%s', tb)
-        # Return JSON rather than relying on template rendering
         return jsonify(status='error', code=500, message='Import failed; see server logs'), 500
 
-
-# safe debug endpoint — add near top with your other routes
-from flask import jsonify
-
+# safe debug endpoint
 @app.route('/_import_debug', methods=['GET'])
 def import_debug():
-    # check if dump.sql exists where import expects it
     dump_path = os.path.join(os.getcwd(), 'dump.sql')
     dump_exists = os.path.exists(dump_path)
 
-    # collect the DB env vars used by your import function (mask them)
     keys = ['MYSQLHOST','MYSQLPORT','MYSQLUSER','MYSQLPASSWORD','MYSQLDATABASE',
             'DB_HOST','DB_PORT','DB_USER','DB_PASSWORD','DB_NAME','IMPORT_SECRET']
     env = {}
@@ -846,10 +830,8 @@ def import_debug():
         if v is None:
             env[k] = None
         else:
-            # mask; show first 3 chars + length
-            env[k] = f"{v[:3]}...({len(v)})"
+            env[k] = f"{v[:3]}...({len(v)})" if len(v) > 6 else v
 
-    # also show current working dir and list of files (short)
     try:
         files = sorted(os.listdir(os.getcwd()))
     except Exception:
@@ -859,13 +841,17 @@ def import_debug():
         'dump_path': dump_path,
         'dump_exists': dump_exists,
         'cwd': os.getcwd(),
-        'files_sample': files[:40],   # don't flood
+        'files_sample': files[:40],
         'env_preview': env
     }), 200
 
-
 # ---------- App bootstrap ----------
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    # Debug False in production; set FLASK_ENV if you want debugging locally
-    app.run(host='0.0.0.0', port=port, debug=False)
+    # allow PORT env or default 5000; parse safely
+    try:
+        raw_port = os.environ.get('PORT', '5000')
+        PORT = int(raw_port) if raw_port and not (raw_port.startswith('${') and '}' in raw_port) else 5000
+    except Exception:
+        PORT = 5000
+
+    app.run(host='0.0.0.0', port=PORT, debug=False)
