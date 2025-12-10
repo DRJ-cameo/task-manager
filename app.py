@@ -828,6 +828,42 @@ def import_db_once():
         return jsonify(status='error', code=500, message='Import failed; see server logs'), 500
 
 
+# safe debug endpoint — add near top with your other routes
+from flask import jsonify
+
+@app.route('/_import_debug', methods=['GET'])
+def import_debug():
+    # check if dump.sql exists where import expects it
+    dump_path = os.path.join(os.getcwd(), 'dump.sql')
+    dump_exists = os.path.exists(dump_path)
+
+    # collect the DB env vars used by your import function (mask them)
+    keys = ['MYSQLHOST','MYSQLPORT','MYSQLUSER','MYSQLPASSWORD','MYSQLDATABASE',
+            'DB_HOST','DB_PORT','DB_USER','DB_PASSWORD','DB_NAME','IMPORT_SECRET']
+    env = {}
+    for k in keys:
+        v = os.getenv(k)
+        if v is None:
+            env[k] = None
+        else:
+            # mask; show first 3 chars + length
+            env[k] = f"{v[:3]}...({len(v)})"
+
+    # also show current working dir and list of files (short)
+    try:
+        files = sorted(os.listdir(os.getcwd()))
+    except Exception:
+        files = ['<cant list>']
+
+    return jsonify({
+        'dump_path': dump_path,
+        'dump_exists': dump_exists,
+        'cwd': os.getcwd(),
+        'files_sample': files[:40],   # don't flood
+        'env_preview': env
+    }), 200
+
+
 # ---------- App bootstrap ----------
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
