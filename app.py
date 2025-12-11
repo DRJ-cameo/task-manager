@@ -32,6 +32,7 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 # Logging
+# NOTE: if you hit Railway rate limits, raise this to WARNING to reduce logs
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("task-manager")
 
