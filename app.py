@@ -22,6 +22,33 @@ import traceback
 app = Flask(__name__, static_folder='static', template_folder='templates')
 app.secret_key = os.environ.get('FLASK_SECRET', 'dev_secret_key')
 
+
+# # ---- start: reduced logging & health/error handlers ----
+# import logging
+# from flask import jsonify
+
+# reduce global logging noise (don't print tracebacks for every request)
+logging.basicConfig(level=logging.WARNING, format="%(levelname)s:%(name)s:%(message)s")
+# lower specific noisy loggers
+for logger_name in ("werkzeug", "gunicorn.error", "gunicorn.access", "mysql.connector", "sqlalchemy"):
+    logging.getLogger(logger_name).setLevel(logging.WARNING)
+
+# If you have an 'app' Flask instance already declared below, keep this:
+# app.logger.setLevel(logging.WARNING)
+
+# A simple, always-available health endpoint for _health checks
+@app.route("/_health", methods=["GET"])
+def _health():
+    return jsonify(status="ok"), 200
+
+# Replace template error handler for 500 to avoid referencing missing templates
+@app.errorhandler(500)
+def internal_server_error(e):
+    # log exception once (keeps logs short)
+    app.logger.exception("Internal server error (caught in handler)")
+    return jsonify(status="error", message="internal server error"), 500
+# ---- end: reduced logging & health/error handlers ----
+
 # Uploads config
 UPLOAD_FOLDER = os.path.join('static', 'uploads', 'avatars')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
