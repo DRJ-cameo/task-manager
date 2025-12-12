@@ -191,21 +191,7 @@ def start_scheduler_if_needed():
 if _db_connection:
     start_scheduler_if_needed()
 
-# ---------- Routes (existing behavior preserved) ----------
 
-# Splash route: show animation then redirect to login
-# @app.route('/splash')
-# def splash():
-#     if 'user_id' in session:
-#         return redirect(url_for('dashboard'))
-#     return render_template('splash.html')
-
-# # Index route redirects to splash for unauthenticated users
-# @app.route('/')
-# def index():
-#     if 'user_id' in session:
-#         return redirect(url_for('dashboard'))
-#     return redirect(url_for('splash'))
 
 # ---------- (Example) login/signup routes (kept minimal here) ----------
 # NOTE: keep your full implementations below; this file intentionally leaves many of your app routes unchanged.
