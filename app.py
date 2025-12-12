@@ -29,28 +29,6 @@ app.secret_key = os.environ.get('FLASK_SECRET', 'dev_secret_key')
 # app.py
 # Patched version — robust port parsing, safer DB helpers and import endpoints.
 
-from flask import (
-    Flask, render_template, request, redirect, session, jsonify,
-    url_for, flash, current_app, abort
-)
-import mysql.connector
-from mysql.connector import Error as MySQLError
-from werkzeug.security import generate_password_hash, check_password_hash
-from werkzeug.utils import secure_filename
-import uuid
-import os
-import smtplib
-import logging
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from datetime import datetime
-from functools import wraps
-from apscheduler.schedulers.background import BackgroundScheduler
-import traceback
-
-# ---------- Configuration ----------
-app = Flask(__name__, static_folder='static', template_folder='templates')
-app.secret_key = os.environ.get('FLASK_SECRET', 'dev_secret_key')
 
 # Uploads config
 UPLOAD_FOLDER = os.path.join('static', 'uploads', 'avatars')
@@ -191,7 +169,21 @@ def start_scheduler_if_needed():
 if _db_connection:
     start_scheduler_if_needed()
 
+# ---------- Routes (existing behavior preserved) ----------
 
+# Splash route: show animation then redirect to login
+# @app.route('/splash')
+# def splash():
+#     if 'user_id' in session:
+#         return redirect(url_for('dashboard'))
+#     return render_template('splash.html')
+
+# # Index route redirects to splash for unauthenticated users
+# @app.route('/')
+# def index():
+#     if 'user_id' in session:
+#         return redirect(url_for('dashboard'))
+#     return redirect(url_for('splash'))
 
 # ---------- (Example) login/signup routes (kept minimal here) ----------
 # NOTE: keep your full implementations below; this file intentionally leaves many of your app routes unchanged.
@@ -706,10 +698,6 @@ def find_and_send_reminders():
             pass
 
 # ---------- Error handlers ----------
-@app.errorhandler(500)
-def server_error(e):
-    logger.exception("Server error: %s", e)
-    return render_template('500.html'), 500
 
 @app.errorhandler(404)
 def not_found(e):
@@ -980,92 +968,8 @@ def parse_int_env(names, default):
             continue
     return default
 
-@app.route('/_import_db_once', methods=['POST'])
-def import_db_once():
-    # require import secret
-    secret = request.headers.get('X-IMPORT-SECRET') or request.args.get('import_secret')
-    expected = os.getenv('IMPORT_SECRET')
-    if not expected or secret != expected:
-        return jsonify(status='error', code=403, message='Forbidden'), 403
 
-    try:
-        # robust host/user/password/database/port parsing
-        host = os.getenv('MYSQLHOST') or os.getenv('MYSQL_HOST') or os.getenv('DB_HOST')
-        user = os.getenv('MYSQLUSER') or os.getenv('MYSQL_USER') or os.getenv('DB_USER')
-        password = os.getenv('MYSQLPASSWORD') or os.getenv('MYSQL_PASSWORD') or os.getenv('DB_PASSWORD')
-        database = os.getenv('MYSQLDATABASE') or os.getenv('MYSQL_DATABASE') or os.getenv('DB_NAME')
-        port = parse_int_env(['MYSQLPORT','MYSQL_PORT','DB_PORT','MYSQL_PORT_3306'], 3306)
 
-        if not all([host, user, password, database]):
-            current_app.logger.error('DB configuration incomplete: host/user/password/database missing')
-            return jsonify(status='error', code=500, message='DB configuration incomplete'), 500
-
-        dump_path = os.path.join(os.getcwd(), 'dump.sql')
-        if not os.path.exists(dump_path):
-            current_app.logger.error(f'dump.sql not found at {dump_path}')
-            return jsonify(status='error', code=404, message='dump.sql not found'), 404
-
-        # Connect and import using mysql-connector
-        conn = mysql.connector.connect(
-            host=host, port=port, user=user, password=password, database=database,
-            connection_timeout=30
-        )
-        cursor = conn.cursor()
-
-        # Read file and execute statements. Multi-statement SQL will be split by semicolon.
-        with open(dump_path, 'r', encoding='utf-8', errors='ignore') as f:
-            sql = f.read()
-
-        # Execute statements safely (simple approach). This tolerates non-critical failures.
-        for stmt in sql.split(';'):
-            stmt = stmt.strip()
-            if not stmt:
-                continue
-            try:
-                cursor.execute(stmt + ';')
-            except Exception as e_stmt:
-                current_app.logger.exception("Statement execution failed (continuing): %s", e_stmt)
-                # continue with remaining statements
-
-        conn.commit()
-        cursor.close()
-        conn.close()
-
-        return jsonify(status='ok', message='Import completed'), 200
-
-    except Exception as e:
-        tb = traceback.format_exc()
-        current_app.logger.error('Import endpoint exception:\n%s', tb)
-        return jsonify(status='error', code=500, message='Import failed; see server logs'), 500
-
-# safe debug endpoint
-@app.route('/_import_debug', methods=['GET'])
-def import_debug():
-    dump_path = os.path.join(os.getcwd(), 'dump.sql')
-    dump_exists = os.path.exists(dump_path)
-
-    keys = ['MYSQLHOST','MYSQLPORT','MYSQLUSER','MYSQLPASSWORD','MYSQLDATABASE',
-            'DB_HOST','DB_PORT','DB_USER','DB_PASSWORD','DB_NAME','IMPORT_SECRET']
-    env = {}
-    for k in keys:
-        v = os.getenv(k)
-        if v is None:
-            env[k] = None
-        else:
-            env[k] = f"{v[:3]}...({len(v)})" if len(v) > 6 else v
-
-    try:
-        files = sorted(os.listdir(os.getcwd()))
-    except Exception:
-        files = ['<cant list>']
-
-    return jsonify({
-        'dump_path': dump_path,
-        'dump_exists': dump_exists,
-        'cwd': os.getcwd(),
-        'files_sample': files[:40],
-        'env_preview': env
-    }), 200
 
 # ---------- App bootstrap ----------
 if __name__ == '__main__':
