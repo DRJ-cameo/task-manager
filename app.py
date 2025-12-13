@@ -697,11 +697,8 @@ def find_and_send_reminders():
         except Exception:
             pass
 
-# ---------- Error handlers ----------
 
-@app.errorhandler(404)
-def not_found(e):
-    return render_template('404.html'), 404
+
 
 # ------------- FORGOT / RESET PASSWORD -------------
 @app.route('/forgot_pass')
