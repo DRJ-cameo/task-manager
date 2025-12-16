@@ -75,7 +75,7 @@ def login_required(f):
     return wrapped
 
 # ================= SCHEDULER =================
-scheduler = BackgroundScheduler()
+# scheduler = BackgroundScheduler()
 
 def find_and_send_reminders():
     try:
@@ -104,6 +104,7 @@ def find_and_send_reminders():
         except Exception:
             pass
 
+
 ENABLE_SCHEDULER = os.getenv("ENABLE_SCHEDULER", "false").lower() == "true"
 
 scheduler = BackgroundScheduler()
@@ -111,11 +112,13 @@ scheduler = BackgroundScheduler()
 @app.before_first_request
 def start_scheduler():
     if not ENABLE_SCHEDULER:
+        logger.info("Scheduler disabled in web container")
         return
+
     scheduler.add_job(find_and_send_reminders, 'interval', minutes=1)
     scheduler.start()
 
-    scheduler_started = True
+
 
 
 # ================= ROUTES =================
