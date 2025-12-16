@@ -104,14 +104,17 @@ def find_and_send_reminders():
         except Exception:
             pass
 
+ENABLE_SCHEDULER = os.getenv("ENABLE_SCHEDULER", "false").lower() == "true"
+
+scheduler = BackgroundScheduler()
+
 @app.before_first_request
 def start_scheduler():
-    global scheduler_started
-    if scheduler_started:
+    if not ENABLE_SCHEDULER:
         return
-
     scheduler.add_job(find_and_send_reminders, 'interval', minutes=1)
     scheduler.start()
+
     scheduler_started = True
 
 
