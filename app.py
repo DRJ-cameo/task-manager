@@ -9,11 +9,15 @@ from apscheduler.schedulers.background import BackgroundScheduler
 import uuid, os, logging, smtplib, traceback
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from werkzeug.middleware.proxy_fix import ProxyFix
+
+
+
 
 # ================= CONFIG =================
 app = Flask(__name__, static_folder='static', template_folder='templates')
 app.secret_key = os.environ.get('FLASK_SECRET', 'dev_secret_key')
-
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 UPLOAD_FOLDER = os.path.join('static', 'uploads', 'avatars')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
@@ -21,6 +25,13 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("task-manager")
+
+app.config.update(
+    SESSION_COOKIE_SECURE=True,
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax"
+)
+
 
 # ================= DB ENV =================
 DB_HOST = os.getenv('DB_HOST')
@@ -176,13 +187,13 @@ def login():
            flash("Password format not supported. Please reset your password.")
            return redirect(url_for("login"))
 
-        if user and valid:
-         session['user_id'] = user['id']
-         session['username'] = user.get('username')
-         return redirect(url_for("dashboard"))
+        session.clear()
+        session['user_id'] = user['id']
+        session['username'] = user.get('username')
+        return redirect(url_for("dashboard"))
 
 
-        flash("Invalid credentials")
+    flash("Invalid credentials")
 
     return render_template('login_page.html')
 
