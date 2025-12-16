@@ -22,6 +22,8 @@ UPLOAD_FOLDER = os.path.join('static', 'uploads', 'avatars')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+scheduler_started = False
+
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("task-manager")
@@ -104,11 +106,14 @@ def find_and_send_reminders():
 
 @app.before_first_request
 def start_scheduler():
-    try:
-        scheduler.add_job(find_and_send_reminders, 'interval', minutes=1)
-        scheduler.start()
-    except Exception as e:
-        logger.warning("Scheduler disabled: %s", e)
+    global scheduler_started
+    if scheduler_started:
+        return
+
+    scheduler.add_job(find_and_send_reminders, 'interval', minutes=1)
+    scheduler.start()
+    scheduler_started = True
+
 
 # ================= ROUTES =================
 
